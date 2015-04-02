@@ -1,31 +1,31 @@
-# Export to TORQUE/PBS job scheduler
-
-# https://wikis.nyu.edu/display/NYUHPC/Tutorial+-+Submitting+a+job+using+qsub
-# http://docs.adaptivecomputing.com/torque/4-0-2/Content/topics/commands/qsub.htm
-# https://acf.ku.edu/wiki/index.php/Cluster_Jobs_Submission_Guide
+# Export a workflow as a TORQUE/PBS array
 
 from .. import core
 from .. import utils
+from .. import templates
 
 import os
 
 __all__ = (
     "to_torque_array",)
 
-def to_torque_array (workflow, filenames_prefix, jobs_factory,
+def to_torque_array (workflow, filenames_prefix,
     outdated_only = True, **qsub_kwargs):
     """ Export a workflow as a TORQUE/PBS array, in which jobs will run in parallel
     """
     if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value type for workflow")
+        raise ValueError("invalid value for workflow: %s (type %s)" % (
+            workflow, type(workflow)))
 
     torque_jobs_fn = filenames_prefix + ".torque_jobs"
     torque_jobs_fh = open(torque_jobs_fn, "w")
 
     n_jobs = 0
-    for job in utils.build_jobs(workflow, jobs_factory,
+    for job_id in workflow.list_jobs(
         outdated_only = outdated_only, with_descendants = False):
-        _, _, _, body, _ = job
+        body = utils.flatten_text_block(
+            templates.render_job(workflow, job_id))
+
         torque_jobs_fh.write(utils.flatten_text_block(body) + '\n')
         n_jobs += 1
 

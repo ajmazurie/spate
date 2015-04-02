@@ -9,7 +9,17 @@ __all__ = (
 def to_graphviz (workflow, filename = None):
     """ Export a workflow as a Graphviz object or Graphviz-formatted file
 
-        note: Pygraphviz must be installed
+        Arguments:
+            workflow (object): workflow object
+            filename (string, optional): name of the output file
+
+        Returns:
+            nothing if a filename is provided, or a Pygraphviz object if not
+
+        Note:
+        [1] For this function to work, the following must be installed:
+            - the Pygraphviz Python library; see http://pygraphviz.github.io/
+            - the Graphviz software package; see http://www.graphviz.org/
     """
     if (not isinstance(workflow, core._workflow)):
         raise ValueError("invalid value type for workflow")
@@ -48,9 +58,31 @@ _GRAPHVIZ_PATH_NODE_FGCOLOR = {
 
 def draw (workflow, filename, outdated_only = True, decorated = True,
     prog = "dot"):
-    """ Export a workflow as a picture
+    """ Export a workflow as a picture, in any format supported by Graphviz
 
-        note: Pygraphviz must be installed
+        The jobs are represented in this picture as nodes in a directed graphs,
+        showing which files each job produces and consumes and how these files
+        are then reused by other jobs.
+
+        Arguments:
+            workflow (object): workflow object
+            filename (string): name of the output file, with extension
+            outdated_only (boolean, optional): if set to True, will only
+                display outdated jobs, rather than all jobs by default
+            decorated (boolean, optional): if set to True, will decorate
+                the jobs with colors to show their status
+            prog (string, optional): program to use within Graphviz to
+                lay out and draw the network of jobs
+
+        Returns:
+            nothing
+
+        Notes:
+        [1] For this function to work, the following must be installed:
+            - the Pygraphviz Python library; see http://pygraphviz.github.io/
+            - the Graphviz software package; see http://www.graphviz.org/
+        [2] A list of available output formats can be retrieved by running
+            `dot "-T?"`; see http://www.graphviz.org/doc/info/output.html
     """
     g = to_graphviz(workflow)
 

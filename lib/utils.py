@@ -14,6 +14,12 @@ def is_iterable (obj):
     return (isinstance(obj, collections.Iterable)) and \
            (not isinstance(obj, types.StringTypes))
 
+def is_function (obj):
+    return isinstance(obj, types.FunctionType)
+
+def is_class (obj):
+    return isinstance(obj, types.ClassType)
+
 def ensure_iterable (obj):
     if (obj is None):
         return []
@@ -42,7 +48,7 @@ def random_string (length = 20, characters = string.lowercase):
 
 def dedent_text_block (text, ignore_empty_lines = False):
     text_ = []
-    for line in textwrap.dedent(text).splitlines():
+    for line in textwrap.dedent(text).strip().splitlines():
         line = line.rstrip()
         if (ignore_empty_lines) and (line == ''):
             continue

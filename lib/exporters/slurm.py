@@ -1,6 +1,8 @@
+# Export a workflow as a SLURM job array
 
 from .. import core
 from .. import utils
+from .. import templates
 
 import os
 
@@ -49,21 +51,24 @@ def _slurm_flag_mapper (flag):
     else:
         return flag
 
-def to_slurm_array (workflow, filenames_prefix, jobs_factory,
+def to_slurm_array (workflow, filenames_prefix,
     outdated_only = True, **sbatch_kwargs):
     """ Export a workflow as a SLURM array, in which jobs will run in parallel
     """
     if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value type for workflow")
+        raise ValueError("invalid value for workflow: %s (type %s)" % (
+            workflow, type(workflow)))
 
     slurm_jobs_fn = filenames_prefix + ".slurm_jobs"
     slurm_jobs_fh = open(slurm_jobs_fn, "w")
 
     n_jobs = 0
-    for job in utils.build_jobs(workflow, jobs_factory,
+    for job_id in workflow.list_jobs(
         outdated_only = outdated_only, with_descendants = False):
-        _, _, _, body, _ = job
-        slurm_jobs_fh.write(utils.flatten_text_block(body) + '\n')
+        body = utils.flatten_text_block(
+            templates.render_job(workflow, job_id))
+
+        slurm_jobs_fh.write(body + '\n')
         n_jobs += 1
 
     slurm_jobs_fh.close()

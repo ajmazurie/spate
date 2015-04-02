@@ -1,0 +1,3 @@
+
+class SpateException (Exception):
+    pass
