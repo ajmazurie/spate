@@ -27,7 +27,7 @@ try:
         # Package description
         name = _PACKAGE_NAME,
         description = "Lightweight file-based workflow management system",
-        version = "%(changeset_latest_tag)sa%(changeset_local_revision)s" % _VERSION,
+        version = "%(changeset_latest_tag)s%(changeset_local_revision)s" % _VERSION,
         author = "Aurelien Mazurie",
         author_email = "ajmazurie@oenone.net",
 
