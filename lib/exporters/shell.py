@@ -7,10 +7,10 @@ import sys
 import os
 
 __all__ = (
-    "to_terminal",
+    "echo",
     "to_shell_script",)
 
-def to_terminal (workflow, outdated_only = True, with_colors = True):
+def echo (workflow, outdated_only = True, with_colors = True, stream = sys.stdout):
     """ Display jobs in the terminal
 
         Arguments:
@@ -19,6 +19,8 @@ def to_terminal (workflow, outdated_only = True, with_colors = True):
                 only print outdated jobs rather than all jobs
             with_colors (boolean, optional): if set to True, will add colors
                 to the output on color-capable terminals
+            stream (file object, optional): file object used for the display;
+                defaults to sys.stdout
 
         Returns:
             int: number of jobs printed
@@ -31,41 +33,45 @@ def to_terminal (workflow, outdated_only = True, with_colors = True):
         raise ValueError("invalid value for workflow: %s (type %s)" % (
             workflow, type(workflow)))
 
-    try:
-        if (with_colors):
-            colorama = utils.ensure_module("colorama")
-            colorama.init()
-            highlight = lambda text: colorama.Style.BRIGHT
+    if (with_colors):
+        colorama = utils.ensure_module("colorama")
+        colorama.init()
 
+    try:
         n_jobs = 0
         for job_id in workflow.list_jobs(outdated_only = outdated_only):
             input_paths, output_paths = workflow.job_inputs_and_outputs(job_id)
 
             for input_path in input_paths:
                 if (with_colors):
-                    sys.stdout.write("%s< %s%s\n" % (
+                    stream.write("%s< %s%s\n" % (
                         colorama.Style.DIM,
                         input_path,
                         colorama.Style.RESET_ALL))
                 else:
-                    sys.stdout.write("< %s\n" % input_path)
+                    stream.write("< %s\n" % input_path)
 
             if (with_colors):
-                sys.stdout.write("%s%s%s\n" % (
+                stream.write("%s%s%s\n" % (
                     colorama.Style.BRIGHT,
                     job_id,
                     colorama.Style.RESET_ALL))
             else:
-                sys.stdout.write("%s\n" % job_id)
+                stream.write("%s\n" % job_id)
 
             for output_path in output_paths:
-                sys.stdout.write("> %s\n" % output_path)
+                stream.write("> %s\n" % output_path)
 
-            sys.stdout.write('\n')
+            stream.write('\n')
             n_jobs += 1
 
-        sys.stdout.write("total: %d job%s\n" % (
-            n_jobs, {True: 's', False: ''}[n_jobs > 1]))
+        if (outdated_only):
+            stream.write("total: %d outdated job%s (out of %d)\n" % (
+                n_jobs, {True: 's', False: ''}[n_jobs > 1],
+                workflow.number_of_jobs))
+        else:
+            stream.write("total: %d job%s\n" % (
+                n_jobs, {True: 's', False: ''}[n_jobs > 1]))
 
     finally:
         if (with_colors):

@@ -126,13 +126,15 @@ class _workflow:
             job_id = "JOB_%d" % (len(filter(
                 lambda (node_type, node): (node_type == _NODE_TYPE.JOB),
                 self._graph.nodes_iter())) + 1)
-        else:
-            job_id = str(job_id)
+        elif (not utils.is_string(job_id)):
+            raise ValueError("invalid value for job_id: %s (type: %s)" % (
+                job_id, type(job_id)))
 
         # constraint: a given job can only be declared once
         job_node_key = (_NODE_TYPE.JOB, job_id)
         if (job_node_key in self._graph):
-            raise Exception("a job with identifier '%s' already exists" % job_id)
+            raise errors.SpateException(
+                "a job with identifier '%s' already exists" % job_id)
 
         # constraint: inputs and outputs must not have duplicates
         utils.ensure_unique(input_paths)
@@ -208,6 +210,24 @@ class _workflow:
 
         logger.debug("job '%s' removed" % job_id)
 
+    def has_job (self, job_id):
+        """ Test if a job is part of this workflow
+
+            Arguments:
+                job_id (str): identifier of the job
+
+            Returns:
+                boolean: True if a job exists with this identifier,
+                    False otherwise
+        """
+        return (job_id in self)
+
+    def __contains__ (self, job_id):
+        if (not utils.is_string(job_id)):
+            return False
+
+        return ((_NODE_TYPE.JOB, job_id) in self._graph)
+
     @property
     def number_of_jobs (self):
         """ Return the number of jobs in this workflow
@@ -241,65 +261,6 @@ class _workflow:
         return len(filter(
             lambda (node_type, node): (node_type == _NODE_TYPE.PATH),
             self._graph.nodes_iter()))
-
-    def job_data (self, job_id):
-        """ Return data associated with a job, if any
-
-            Arguments:
-                job_id (str): identifier of the job
-
-            Returns:
-                dict: data associated with this job
-
-            Notes:
-            [1] A SpateException will be raised if the job doesn't exist
-        """
-        job_node_key = self._ensure_existing_job(job_id)
-        return self._graph.node[job_node_key]["_data"]
-
-    def job_template (self, job_id):
-        """ Return the template associated with a job, if any
-
-            Arguments:
-                job_id (str): identifier of the job
-
-            Returns:
-                str: template associated with this job
-
-            Notes:
-            [1] A SpateException will be raised if the job doesn't exist
-        """
-        job_node_key = self._ensure_existing_job(job_id)
-        return self._graph.node[job_node_key]["template"]
-
-    def job_inputs_and_outputs (self, job_id):
-        """ Return input and output paths associated with a job, if any
-
-            Arguments:
-                job_id (str): identifier of the job
-
-            Returns:
-                list of str: list of input paths (or empty list)
-                list of str: list of output paths (or empty list)
-
-            [1] A SpateException will be raised if the job doesn't exist
-        """
-        job_node_key = self._ensure_existing_job(job_id)
-
-        input_paths = []
-        for (_, input_path) in self._graph.predecessors(job_node_key):
-            edge = self._graph[(_NODE_TYPE.PATH, input_path)][job_node_key]
-            input_paths.append((edge["_order"], input_path))
-
-        output_paths = []
-        for (_, output_path) in self._graph.successors(job_node_key):
-            edge = self._graph[job_node_key][(_NODE_TYPE.PATH, output_path)]
-            output_paths.append((edge["_order"], output_path))
-
-        return (
-            tuple([input_path for (_, input_path) in sorted(input_paths)]),
-            tuple([output_path for (_, output_path) in sorted(output_paths)])
-        )
 
     def list_jobs (self, outdated_only = True, with_descendants = True,
         with_paths = False, with_explanations = False):
@@ -418,6 +379,65 @@ class _workflow:
 
                 yield tuple(rset)
 
+    def job_inputs_and_outputs (self, job_id):
+        """ Return input and output paths associated with a job, if any
+
+            Arguments:
+                job_id (str): identifier of the job
+
+            Returns:
+                list of str: list of input paths (or empty list)
+                list of str: list of output paths (or empty list)
+
+            [1] A SpateException will be raised if the job doesn't exist
+        """
+        job_node_key = self._ensure_existing_job(job_id)
+
+        input_paths = []
+        for (_, input_path) in self._graph.predecessors(job_node_key):
+            edge = self._graph[(_NODE_TYPE.PATH, input_path)][job_node_key]
+            input_paths.append((edge["_order"], input_path))
+
+        output_paths = []
+        for (_, output_path) in self._graph.successors(job_node_key):
+            edge = self._graph[job_node_key][(_NODE_TYPE.PATH, output_path)]
+            output_paths.append((edge["_order"], output_path))
+
+        return (
+            tuple([input_path for (_, input_path) in sorted(input_paths)]),
+            tuple([output_path for (_, output_path) in sorted(output_paths)])
+        )
+
+    def job_template (self, job_id):
+        """ Return the template associated with a job, if any
+
+            Arguments:
+                job_id (str): identifier of the job
+
+            Returns:
+                str: template associated with this job
+
+            Notes:
+            [1] A SpateException will be raised if the job doesn't exist
+        """
+        job_node_key = self._ensure_existing_job(job_id)
+        return self._graph.node[job_node_key]["template"]
+
+    def job_data (self, job_id):
+        """ Return data associated with a job, if any
+
+            Arguments:
+                job_id (str): identifier of the job
+
+            Returns:
+                dict: data associated with this job
+
+            Notes:
+            [1] A SpateException will be raised if the job doesn't exist
+        """
+        job_node_key = self._ensure_existing_job(job_id)
+        return self._graph.node[job_node_key]["_data"]
+
     def __add__ (self, obj):
         if (not isinstance(obj, self.__class__)):
             raise ValueError("cannot add '%s' to %s" % (obj, self))
@@ -490,11 +510,12 @@ def from_json (data):
     except KeyError as e:
         raise ValueError("invalid JSON document: missing key '%s'" % e.args[0])
 
-def load (filename):
+def load (input_file):
     """ Create a new workflow object from a JSON-formatted file
 
         Arguments:
-            filename (str): name of the JSON-formatted file
+            input_file (str or file object): the name of the JSON-formatted
+                file, or a file object open in reading mode
 
         Returns:
             object: a workflow object
@@ -503,10 +524,13 @@ def load (filename):
         [1] The JSON-formatted file must comply to the schema shown in the
             documentation of the `from_json` method
     """
-    if (filename.lower().endswith(".gz")):
-        fh = gzip.open(filename, "rb")
+    if (utils.is_string(input_file)):
+        if (input_file.lower().endswith(".gz")):
+            fh = gzip.open(input_file, "rb")
+        else:
+            fh = open(input_file, "rU")
     else:
-        fh = open(filename, "rU")
+        fh = input_file
 
     return from_json(json.load(fh))
 
@@ -547,12 +571,13 @@ def to_json (workflow, outdated_only = True):
 
     return data
 
-def save (workflow, filename, outdated_only = True):
+def save (workflow, output_file, outdated_only = True):
     """ Export a workflow as a JSON-formatted file
 
         Arguments:
             workflow (object): a workflow object
-            filename (str): the name of a JSON-formatted output file
+            output_file (str or file object): the name of a JSON-formatted
+                output file, or a file object open in writing mode
             outdated_only (boolean, optional): if set to True, will only export
                 jobs that need to be re-run; if False, all jobs are exported
 
@@ -563,10 +588,13 @@ def save (workflow, filename, outdated_only = True):
         [1] The JSON file is formatted as shown in the documentation of the
             `from_json` method
     """
-    if (filename.lower().endswith(".gz")):
-        fh = gzip.open(filename, "wb")
+    if (utils.is_string(output_file)):
+        if (output_file.lower().endswith(".gz")):
+            fh = gzip.open(output_file, "wb")
+        else:
+            fh = open(output_file, 'w')
     else:
-        fh = open(filename, 'w')
+        fh = output_file
 
     json.dump(
         to_json(workflow, outdated_only),

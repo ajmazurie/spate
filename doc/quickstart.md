@@ -46,7 +46,7 @@ print "number of paths:", workflow.number_of_paths
 # print the jobs in this workflow, in the order of their
 # execution; note that for the with_colors option to work,
 # the optional dependency 'colorama' must be installed
-spate.to_terminal(workflow, with_colors = True)
+spate.echo(workflow, with_colors = True)
 
 # save this workflow for latter use
 spate.save(workflow, "example_1.spate.gz")
@@ -70,10 +70,10 @@ x
 y
 > D
 
-total: 3 jobs
+total: 2 outdated jobs (out of 2)
 ```
 
-Here the `spate.to_terminal()` function generated a simple list of job identifiers preceded by input paths (lines prefixed with `<`) and followed by output paths (lines prefixed with `>`). If this workflow was to be executed, job `x` would be run before job `y`.
+Here the `spate.echo()` function generated a simple list of job identifiers preceded by input paths (lines prefixed with `<`) and followed by output paths (lines prefixed with `>`). If this workflow was to be executed, job `x` would be run before job `y`.
 
 ### Example 2. Basic concrete workflow
 

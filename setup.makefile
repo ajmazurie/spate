@@ -6,7 +6,7 @@ BOLD := \033[1m
 DIM := \033[2m
 RESET := \033[0m
 
-all: install clean
+all: uninstall install clean test
 
 uninstall:
 	@echo -e "$(BOLD)uninstalling '$(PROJECT_NAME)'$(RESET)"
@@ -27,3 +27,11 @@ clean:
 	@rm -rf build
 	@rm -rf dist
 	@rm -rf **/$(PROJECT_NAME).egg-info
+	@rm -rf $(PROJECT_NAME).egg-info
+
+test:
+	@echo -e "$(BOLD)running test units for '$(PROJECT_NAME)'$(RESET)"
+	@python -m unittest discover \
+		-s tests -p 'tests_*.py' \
+		--verbose
+	@rm -rf tests/*.pyc
