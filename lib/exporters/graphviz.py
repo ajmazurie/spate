@@ -6,12 +6,14 @@ __all__ = (
     "draw",
     "to_graphviz")
 
-def to_graphviz (workflow, filename = None):
+def to_graphviz (workflow, filename = None, outdated_only = True):
     """ Export a workflow as a Graphviz object or Graphviz-formatted file
 
         Arguments:
             workflow (object): workflow object
             filename (string, optional): name of the output file
+            outdated_only (boolean, optional): if set to True, will only
+                export outdated jobs instead of all jobs by default
 
         Returns:
             nothing if a filename is provided, or a Pygraphviz object if not
@@ -29,31 +31,53 @@ def to_graphviz (workflow, filename = None):
     g = pygraphviz.AGraph(name = workflow.name,
         directed = True, strict = True)
 
-    node_id = lambda (node_type, node): "%s:%s" % (node_type.name, node)
+    node_id = lambda node_type, node: "%s:%s" % (node_type.name, node)
 
-    for node_key in workflow._graph.nodes_iter():
-        node_type, node = node_key
-        g.add_node(
-            node_id(node_key),
-            label = node,
-            _node_type = node_type.name)
+    jobs = workflow.list_jobs(
+        outdated_only = outdated_only,
+        with_status = True,
+        with_paths = True)
 
-    for (source_node_key, target_node_key) in workflow._graph.edges_iter():
-        g.add_edge(
-            node_id(source_node_key),
-            node_id(target_node_key))
+    for ((job_id, job_status), input_paths_status, output_paths_status) in jobs:
+        job_node_key = node_id(core._NODE_TYPE.JOB, job_id)
+        g.add_node(job_node_key,
+            label = job_id,
+            _type = core._NODE_TYPE.JOB.name,
+            _status = job_status.name)
+
+        all_paths_status = (
+            (True, input_paths_status),
+            (False, output_paths_status))
+
+        for (is_input, paths_status) in all_paths_status:
+            for (path, path_status) in paths_status:
+                path_node_key = node_id(core._NODE_TYPE.PATH, path)
+
+                if (not g.has_node(path_node_key)):
+                    g.add_node(path_node_key,
+                        label = path,
+                        _type = core._NODE_TYPE.PATH.name,
+                        _status = path_status.name)
+
+                if (is_input):
+                    g.add_edge(path_node_key, job_node_key)
+                else:
+                    g.add_edge(job_node_key, path_node_key)
 
     if (filename is not None):
         g.write(filename)
     else:
         return g
 
+_GRAPHVIZ_JOB_NODE_FGCOLOR = {
+    core.JOB_STATUS.CURRENT:   (  0, 255,   0),  # bright green
+    core.JOB_STATUS.OUTDATED:  (255, 128,   0),  # bright orange
+}
+
 _GRAPHVIZ_PATH_NODE_FGCOLOR = {
-    None:                             (190, 214,  47),
-    core.EXPLANATION.MISSING_INPUT:   (217,  27,  92),
-    core.EXPLANATION.MISSING_OUTPUT:  (217,  27,  92),
-    core.EXPLANATION.POSTDATE_OUTPUT: (252, 176,  64),
-    core.EXPLANATION.WILL_UPDATE:     (  0, 174, 239),
+    core.PATH_STATUS.CURRENT:  (229, 255, 204),  # pale green
+    core.PATH_STATUS.MISSING:  (255, 153, 153),  # pale red
+    core.PATH_STATUS.OUTDATED: (255, 204, 153),  # pale orange
 }
 
 def draw (workflow, filename, outdated_only = True, decorated = True,
@@ -65,10 +89,11 @@ def draw (workflow, filename, outdated_only = True, decorated = True,
         are then reused by other jobs.
 
         Arguments:
-            workflow (object): workflow object
+            workflow (object): workflow object, or pygraphviz AGraph object
             filename (string): name of the output file, with extension
             outdated_only (boolean, optional): if set to True, will only
-                display outdated jobs, rather than all jobs by default
+                display outdated jobs, rather than all jobs by default;
+                ignored if workflow is a pygraphviz AGraph object
             decorated (boolean, optional): if set to True, will decorate
                 the jobs with colors to show their status
             prog (string, optional): program to use within Graphviz to
@@ -84,9 +109,13 @@ def draw (workflow, filename, outdated_only = True, decorated = True,
         [2] A list of available output formats can be retrieved by running
             `dot "-T?"`; see http://www.graphviz.org/doc/info/output.html
     """
-    g = to_graphviz(workflow)
+    pygraphviz = utils.ensure_module("pygraphviz")
 
-    # set some generic graphical properties for the graph, nodes and edges
+    if (isinstance(workflow, pygraphviz.AGraph)):
+        g = workflow
+    else:
+        g = to_graphviz(workflow, outdated_only = outdated_only)
+
     g.graph_attr["rankdir"] = "LR"
     #g.graph_attr["nodesep"] = 2.0
     g.graph_attr["overlap"] = "scale"
@@ -94,37 +123,27 @@ def draw (workflow, filename, outdated_only = True, decorated = True,
     g.node_attr["style"] = "rounded,filled"
     g.node_attr["fontname"] = "Monospace"
 
-    # distinguish between job and path nodes
     for node in g.nodes_iter():
-        if (node.attr["_node_type"] == core._NODE_TYPE.JOB.name):
-            node.attr["shape"] = "circle"
-            node.attr["fontsize"] = 20
-            node.attr["fontname"] = "Helvetica"
+        try:
+            if (node.attr["_type"] == core._NODE_TYPE.JOB.name):
+                node.attr["shape"] = "circle"
+                node.attr["fontsize"] = 20
+                node.attr["fontname"] = "Helvetica"
 
-        elif (node.attr["_node_type"] == core._NODE_TYPE.PATH.name):
-            pass
+                if (decorated):
+                    job_status = core.JOB_STATUS[node.attr["_status"]]
+                    node.attr["fillcolor"] = \
+                        "#%02X%02X%02X" % _GRAPHVIZ_JOB_NODE_FGCOLOR[job_status]
 
-    jobs = workflow.list_jobs(
-        outdated_only = outdated_only,
-        with_explanations = True)
+            elif (node.attr["_type"] == core._NODE_TYPE.PATH.name):
+                if (decorated):
+                    path_status = core.PATH_STATUS[node.attr["_status"]]
+                    node.attr["fillcolor"] = \
+                        "#%02X%02X%02X" % _GRAPHVIZ_PATH_NODE_FGCOLOR[path_status]
 
-    for (job_id, explanations) in jobs:
-        job_node = g.get_node("%s:%s" % (core._NODE_TYPE.JOB.name, job_id))
-        for (path, reason_code) in explanations.iteritems():
-            path_node = g.get_node("%s:%s" % (core._NODE_TYPE.PATH.name, path))
-            path_node.attr["fillcolor"] = \
-                "#%02X%02X%02X" % _GRAPHVIZ_PATH_NODE_FGCOLOR[reason_code]
-
-    # jobs_to_draw = {}
-    # for (job_id, explanations) in jobs:
-    #     jobs_to_draw[job_id] = True
-
-    # for node in g.nodes_iter():
-    #     if (node.attr["_node_type"] == core._NODE_TYPE.JOB.name) and \
-    #        (node.label not in jobs_to_draw):
-    #        g.
-
-    # if (decorated):
-    #     for () in :
+        except KeyError as e:
+            raise Exception(
+                "invalid pygraphviz object: missing key '%s' for node %s" % (
+                    e.args[0], node))
 
     g.draw(filename, prog = prog)
