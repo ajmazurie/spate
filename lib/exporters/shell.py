@@ -143,7 +143,7 @@ def echo (workflow, outdated_only = True, decorated = True, colorized = True,
     return n_jobs
 
 def to_shell_script (workflow, filename, outdated_only = True,
-    shell = "/bin/bash", *shell_args):
+    shell = "/bin/bash", shell_args = []):
     """ Export a workflow as a shell script
 
         Arguments:
@@ -153,8 +153,8 @@ def to_shell_script (workflow, filename, outdated_only = True,
                 only export outdated jobs rather than all jobs
             shell (str, optional): path to the shell to use; if none provided
                 then /bin/bash is used by default
-            *shell_args (str, optional): options for the shell, which will be
-                inserted before the jobs
+            shell_args (str or list of str, optional): options for the shell,
+                which will be inserted before the jobs
 
         Returns:
             int: number of jobs exported
@@ -168,8 +168,6 @@ def to_shell_script (workflow, filename, outdated_only = True,
             use the "set -e" argument ('errexit', see bash documentation) so
             that any job returning a non-zero exit code aborts the workflow
         [4] If no job is found in the workflow, no file will be created
-
-        FIXME: shell_args is not properly handled
     """
     if (not isinstance(workflow, core._workflow)):
         raise ValueError("invalid value for workflow: %s (type %s)" % (
@@ -178,11 +176,11 @@ def to_shell_script (workflow, filename, outdated_only = True,
     o = open(filename, "w")
     o.write("#%s\n" % shell.strip())
 
+    shell_args = utils.ensure_iterable(shell_args)
     if (len(shell_args) > 0):
         o.write('\n')
         for shell_arg in shell_args:
             o.write("%s\n" % str(shell_arg).strip())
-        o.write('\n')
 
     n_jobs = 0
     for job_id in workflow.list_jobs(outdated_only = outdated_only):
