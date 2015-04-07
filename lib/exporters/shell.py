@@ -10,15 +10,21 @@ __all__ = (
     "echo",
     "to_shell_script",)
 
-def echo (workflow, outdated_only = True, with_colors = True, stream = sys.stdout):
+def echo (workflow, outdated_only = True, decorated = True, colorized = True,
+    with_suffix = False, stream = sys.stdout):
     """ Display jobs in the terminal
 
         Arguments:
             workflow (object): a workflow object
             outdated_only (boolean, optional): if set to True (default), will
                 only print outdated jobs rather than all jobs
-            with_colors (boolean, optional): if set to True, will add colors
-                to the output on color-capable terminals
+            decorated (boolean, optional): if set to True, will highlight
+                the job names and dim the input paths on ANSI terminals
+            colorized (boolean, optional): if set to True, will add colors
+                to the output on ANSI terminals; ignored if decorated = False
+            with_suffix (boolean, optional): if set to True, paths and jobs
+                names will receive a suffix showing their status, if different
+                from current
             stream (file object, optional): file object used for the display;
                 defaults to sys.stdout
 
@@ -26,41 +32,98 @@ def echo (workflow, outdated_only = True, with_colors = True, stream = sys.stdou
             int: number of jobs printed
 
         Notes:
-        [1] For the with_colors argument to work, the Colorama library must be
-            installed; see https://pypi.python.org/pypi/colorama
+        [1] For the `decorated` or `colorized` arguments to work, Colorama must
+            be installed; see https://pypi.python.org/pypi/colorama
     """
     if (not isinstance(workflow, core._workflow)):
         raise ValueError("invalid value for workflow: %s (type %s)" % (
             workflow, type(workflow)))
 
-    if (with_colors):
+    _TERMINAL_JOB_LINE_SUFFIX = {
+        core.JOB_STATUS.CURRENT: '',
+        core.JOB_STATUS.OUTDATED: " OUTDATED",
+    }
+
+    _TERMINAL_PATH_LINE_SUFFIX = {
+        core.PATH_STATUS.CURRENT: '',
+        core.PATH_STATUS.OUTDATED: " OUTDATED",
+        core.PATH_STATUS.MISSING: " MISSING",
+    }
+
+    def job_line (job_id, job_status):
+        return "%s%s" % (
+            job_id,
+            {
+                True: _TERMINAL_JOB_LINE_SUFFIX[job_status],
+                False: ''
+            }[with_suffix])
+
+    def path_line (path, path_status, is_input):
+        return "%s %s%s" % (
+            {
+                True: '<',
+                False: '>'
+            }[is_input],
+            path,
+            {
+                True: _TERMINAL_PATH_LINE_SUFFIX[path_status],
+                False: ''
+            }[with_suffix])
+
+    if (not decorated):
+        colorized = False
+
+    if (decorated or colorized):
         colorama = utils.ensure_module("colorama")
         colorama.init()
 
+        _TERMINAL_JOB_LINE_FGCOLOR = {
+            core.JOB_STATUS.CURRENT:   colorama.Fore.GREEN,
+            core.JOB_STATUS.OUTDATED:  colorama.Fore.YELLOW,
+        }
+
+        _TERMINAL_PATH_LINE_FGCOLOR = {
+            core.PATH_STATUS.CURRENT:  colorama.Style.DIM + colorama.Fore.GREEN,
+            core.PATH_STATUS.MISSING:  colorama.Style.DIM + colorama.Fore.RED,
+            core.PATH_STATUS.OUTDATED: colorama.Style.DIM + colorama.Fore.YELLOW,
+        }
+
+        raw_job_line = job_line
+        raw_path_line = path_line
+
+        def job_line (job_id, job_status):
+            return {
+                    True: _TERMINAL_JOB_LINE_FGCOLOR[job_status],
+                    False: colorama.Style.BRIGHT,
+                }[colorized] + \
+                raw_job_line(job_id, job_status) + \
+                colorama.Style.RESET_ALL
+
+        def path_line (path, path_status, is_input):
+            return {
+                    (True, True): _TERMINAL_PATH_LINE_FGCOLOR[path_status],
+                    (True, False): _TERMINAL_PATH_LINE_FGCOLOR[path_status],
+                    (False, True): colorama.Style.DIM,
+                    (False, False): '',
+                }[(colorized, is_input)] + \
+                raw_path_line(path, path_status, is_input) + \
+                colorama.Style.RESET_ALL
+
+    jobs = workflow.list_jobs(
+        outdated_only = outdated_only,
+        with_status = True,
+        with_paths = True)
+
     try:
         n_jobs = 0
-        for job_id in workflow.list_jobs(outdated_only = outdated_only):
-            input_paths, output_paths = workflow.job_inputs_and_outputs(job_id)
+        for ((job_id, job_status), input_paths, output_paths) in jobs:
+            for (input_path, path_status) in input_paths:
+                stream.write(path_line(input_path, path_status, True) + '\n')
 
-            for input_path in input_paths:
-                if (with_colors):
-                    stream.write("%s< %s%s\n" % (
-                        colorama.Style.DIM,
-                        input_path,
-                        colorama.Style.RESET_ALL))
-                else:
-                    stream.write("< %s\n" % input_path)
+            stream.write(job_line(job_id, job_status) + '\n')
 
-            if (with_colors):
-                stream.write("%s%s%s\n" % (
-                    colorama.Style.BRIGHT,
-                    job_id,
-                    colorama.Style.RESET_ALL))
-            else:
-                stream.write("%s\n" % job_id)
-
-            for output_path in output_paths:
-                stream.write("> %s\n" % output_path)
+            for (output_path, path_status) in output_paths:
+                stream.write(path_line(output_path, path_status, False) + '\n')
 
             stream.write('\n')
             n_jobs += 1
@@ -74,7 +137,7 @@ def echo (workflow, outdated_only = True, with_colors = True, stream = sys.stdou
                 n_jobs, {True: 's', False: ''}[n_jobs > 1]))
 
     finally:
-        if (with_colors):
+        if (decorated or colorized):
             colorama.deinit()
 
     return n_jobs

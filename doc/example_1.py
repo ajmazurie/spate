@@ -12,9 +12,9 @@ print "number of jobs:", workflow.number_of_jobs
 print "number of paths:", workflow.number_of_paths
 
 # print the jobs in this workflow, in the order of their
-# execution; note that for the with_colors option to work,
-# the optional dependency 'colorama' must be installed
-spate.echo(workflow, with_colors = True)
+# execution; note that for the 'colorized' option to work,
+# the optional dependency 'Colorama' must be installed
+spate.echo(workflow, colorized = True)
 
 # save this workflow for latter use
 spate.save(workflow, "example_1.spate.gz")
