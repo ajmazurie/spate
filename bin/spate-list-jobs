@@ -1,0 +1,112 @@
+#!/usr/bin/env python
+
+import sys, os
+import logging
+import logging.config
+import argparse
+
+import spate
+
+parser = argparse.ArgumentParser(
+    description = """List jobs in an existing workflow, in the order of their
+    execution""")
+
+parser.add_argument("-i", "--input",
+    dest = "input_fn", metavar = "FILE",
+    help = "(optional) JSON or YAML-formatted workflow; default: standard input")
+
+parser.add_argument("-a", "--all-jobs",
+    dest = "outdated_only", action = "store_false", default = True,
+    help = "(optional) if set, will consider all jobs instead of outdated ones")
+
+parser.add_argument("-d", "--id-only",
+    dest = "id_only", action = "store_true", default = False,
+    help = "(optional) if set, will limit the display to job identifiers only")
+
+parser.add_argument("-c", "--count-only",
+    dest = "count_only", action = "store_true", default = False,
+    help = "(optional) if set, will limit the display to a number of jobs only")
+
+display_options = parser.add_argument_group("options for full display")
+
+display_options.add_argument("--no-color",
+    dest = "colorize", action = "store_false", default = True,
+    help = "(optional) if set, will not add colors to the output")
+
+display_options.add_argument("--no-decoration",
+    dest = "decorate", action = "store_false", default = True,
+    help = "(optional) if set, will not decorate the output; implies --no-color")
+
+display_options.add_argument("--with-suffix",
+    dest = "with_suffix", action = "store_true", default = False,
+    help = "(optional) if set, will add status information as suffix")
+
+parser.add_argument("-v", "--verbose",
+    dest = "verbose", action = "store_true", default = False,
+    help = "(optional) if set, will display debug information")
+
+options = parser.parse_args()
+
+logger = logging.getLogger(os.path.basename(__file__))
+
+if (options.verbose):
+    logging_level = logging.DEBUG
+else:
+    logging_level = logging.INFO
+
+logging.config.dictConfig({
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"default": {
+        "format": "[%(asctime)s] %(levelname)s: %(message)s"
+        }},
+    "handlers": {"default": {
+        "class": "logging.StreamHandler",
+        "formatter": "default",
+        }},
+    "loggers": {"": {
+        "handlers": ["default"],
+        "level": logging_level,
+        "propagate": True
+        }}
+    })
+
+def error (msg, is_exception = False):
+    if (is_exception):
+        logger.exception(msg)
+    else:
+        logger.error(msg)
+    sys.exit(1)
+
+if (options.input_fn is None):
+    options.input_fn = sys.stdin
+
+elif (not os.path.exists(options.input_fn)):
+    error("file not found: %s" % options.input_fn)
+
+if (options.id_only and options.count_only):
+    error("--id-only is not compatible with --count-only")
+
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+try:
+    w = spate.load(options.input_fn)
+
+    if (options.id_only or options.count_only):
+        jobs = w.list_jobs(outdated_only = options.outdated_only)
+
+        if (options.id_only):
+            for job_id in jobs:
+                sys.stdout.write("%s\n" % job_id)
+        else:
+            sys.stdout.write("%d\n" % len(list(jobs)))
+
+    else:
+        spate.echo(w,
+            outdated_only = options.outdated_only,
+            decorated = options.decorate,
+            colorized = options.colorize,
+            with_suffix = options.with_suffix)
+
+except spate.SpateException as e:
+    error(str(e))

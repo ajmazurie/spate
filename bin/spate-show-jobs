@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+
+import sys, os
+import logging
+import logging.config
+import argparse
+
+import spate
+
+parser = argparse.ArgumentParser(
+    description = "Create a visual representation of an existing workflow")
+
+parser.add_argument("-i", "--input",
+    dest = "input_fn", metavar = "FILE",
+    help = """(optional) JSON or YAML-formatted workflow; default: standard
+    input""")
+
+parser.add_argument("-o", "--output",
+    dest = "output_fn", metavar = "FILE", required = True,
+    help = "(mandatory) output file")
+
+parser.add_argument("-a", "--all-jobs",
+    dest = "outdated_only", action = "store_false", default = True,
+    help = """(optional) if set, will display all jobs instead of outdated ones
+    only""")
+
+graphviz_options = parser.add_argument_group("options for layout and display")
+
+graphviz_options.add_argument("--format",
+    dest = "output_format", metavar = "STRING",
+    help = """(optional) output file format; if not provided, the format will
+    be inferred from the output filename""")
+
+graphviz_options.add_argument("--program",
+    dest = "graphviz_prog", metavar = "NAME", default = "dot",
+    help = """(optional) Graphviz program name to use for the layout and
+    display; default: %(default)s""")
+
+graphviz_options.add_argument("--program-args",
+    dest = "graphviz_prog_arg", metavar = "STRING",
+    help = "(optional) Options for the Graphviz program, as a single string")
+
+parser.add_argument("-v", "--verbose",
+    dest = "verbose", action = "store_true", default = False,
+    help = "(optional) if set, will display debug information")
+
+options = parser.parse_args()
+
+logger = logging.getLogger(os.path.basename(__file__))
+
+if (options.verbose):
+    logging_level = logging.DEBUG
+else:
+    logging_level = logging.INFO
+
+logging.config.dictConfig({
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"default": {
+        "format": "[%(asctime)s] %(levelname)s: %(message)s"
+        }},
+    "handlers": {"default": {
+        "class": "logging.StreamHandler",
+        "formatter": "default",
+        }},
+    "loggers": {"": {
+        "handlers": ["default"],
+        "level": logging_level,
+        "propagate": True
+        }}
+    })
+
+def error (msg, is_exception = False):
+    if (is_exception):
+        logger.exception(msg)
+    else:
+        logger.error(msg)
+    sys.exit(1)
+
+if (options.input_fn is None):
+    options.input_fn = sys.stdin
+
+elif (not os.path.exists(options.input_fn)):
+    error("file not found: %s" % options.input_fn)
+
+#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+try:
+    w = spate.load(options.input_fn)
+
+    spate.draw(w,
+        options.output_fn,
+        outdated_only = options.outdated_only,
+        format = options.output_format,
+        prog = options.graphviz_prog,
+        prog_args = options.graphviz_prog_arg)
+
+except spate.SpateException as e:
+    error(str(e))

@@ -88,7 +88,7 @@ _GRAPHVIZ_FORMAT_ERROR = re.compile(
     "Format: \"(.+?)\" not recognized\. Use one of: (.*)")
 
 def draw (workflow, filename, outdated_only = True, decorated = True,
-    prog = "dot"):
+    format = None, prog = "dot", prog_args = None):
     """ Export a workflow as a picture, in any format supported by Graphviz
 
         The jobs are represented in this picture as nodes in a directed graphs,
@@ -103,8 +103,11 @@ def draw (workflow, filename, outdated_only = True, decorated = True,
                 ignored if workflow is a pygraphviz AGraph object
             decorated (boolean, optional): if set to True, will decorate
                 the jobs with colors to show their status
+            format (str, optional): format for the output file; if none is
+                provided, it will be inferred from the output filename
             prog (string, optional): program to use within Graphviz to
                 lay out and draw the network of jobs
+            **prog_args (str, optional): options for the Graphviz program
 
         Returns:
             nothing
@@ -154,7 +157,10 @@ def draw (workflow, filename, outdated_only = True, decorated = True,
                     e.args[0], node))
 
     try:
-        g.draw(filename, prog = prog)
+        g.draw(filename,
+            format = str(format).lower() if (format is not None) else None,
+            prog = str(prog).lower(),
+            args = prog_args if (prog_args is not None) else '')
 
     except IOError as e:
         m = _GRAPHVIZ_FORMAT_ERROR.match(str(e))
