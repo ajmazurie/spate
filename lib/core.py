@@ -3,21 +3,14 @@
 import utils
 import errors
 
-import json
 import enum
-import collections
 import itertools
 import logging
-import gzip
 
 import networkx
 
 __all__ = (
     "new_workflow",
-    "from_json",
-    "load",
-    "to_json",
-    "save",
     "JOB_STATUS",
     "PATH_STATUS")
 
@@ -159,7 +152,7 @@ class _workflow:
 
         self._graph.add_node(
             job_node_key,
-            template = template,
+            _template = template,
             _data = kwargs)
 
         for (n, input_path) in enumerate(input_paths):
@@ -430,7 +423,7 @@ class _workflow:
             [1] A SpateException will be raised if the job doesn't exist
         """
         job_node_key = self._ensure_existing_job(job_id)
-        return self._graph.node[job_node_key]["template"]
+        return self._graph.node[job_node_key]["_template"]
 
     def job_data (self, job_id):
         """ Return data associated with a job, if any
@@ -451,7 +444,7 @@ class _workflow:
         if (not isinstance(obj, self.__class__)):
             raise ValueError("cannot add '%s' to %s" % (obj, self))
 
-        merged_workflow = Workflow("%s+%s" % (self.name, obj.name))
+        merged_workflow = _workflow("%s+%s" % (self.name, obj.name))
 
         for workflow in (self, obj):
             jobs = workflow.list_jobs(outdated_only = False, with_paths = True)
@@ -459,6 +452,7 @@ class _workflow:
                 merged_workflow.add_job(
                     input_paths, output_paths,
                     "%s:%s" % (workflow.name, job_id),
+                    workflow.job_template(job_id),
                     **workflow.job_data(job_id))
 
         logger.debug("merged workflow %s with %s" % (self, obj))
@@ -478,135 +472,3 @@ def new_workflow (workflow_name = None):
             object: a workflow object
     """
     return _workflow(workflow_name)
-
-def from_json (data):
-    """ Create a new workflow object from a JSON object
-
-        Arguments:
-            data (dict): a JSON document
-
-        Returns:
-            object: a workflow object
-
-        Notes:
-        [1] The JSON document must comply to the following schema:
-            {
-                "workflow": str  # name of the workflow
-                "jobs": [  # list of jobs
-                    {
-                        "id": str,  # job name
-                        "inputs": list of str,  # list of input paths
-                        "outputs": list of str,  # list of output paths
-                        "template": str,  # job template (optional)
-                        "data": dict,  # data associated with this job (optional)
-                    },
-                    ...
-                ]
-            }
-    """
-    try:
-        w = _workflow(data["workflow"]["name"])
-        for job in data["jobs"]:
-            w.add_job(
-                job["inputs"],
-                job["outputs"],
-                job.get("template"),
-                job["id"],
-                **job.get("data", {}))
-
-        return w
-
-    except KeyError as e:
-        raise ValueError("invalid JSON document: missing key '%s'" % e.args[0])
-
-def load (input_file):
-    """ Create a new workflow object from a JSON-formatted file
-
-        Arguments:
-            input_file (str or file object): the name of the JSON-formatted
-                file, or a file object open in reading mode
-
-        Returns:
-            object: a workflow object
-
-        Notes:
-        [1] The JSON-formatted file must comply to the schema shown in the
-            documentation of the `from_json` method
-    """
-    if (utils.is_string(input_file)):
-        if (input_file.lower().endswith(".gz")):
-            fh = gzip.open(input_file, "rb")
-        else:
-            fh = open(input_file, "rU")
-    else:
-        fh = input_file
-
-    return from_json(json.load(fh))
-
-def to_json (workflow, outdated_only = True):
-    """ Export a workflow as a JSON document
-
-        Arguments:
-            workflow (object): a workflow object
-            outdated_only (boolean, optional): if set to True, will only export
-                jobs that need to be re-run; if False, all jobs are exported
-
-        Returns:
-            dict: a JSON document
-
-        Notes:
-        [1] The JSON document is formatted as shown in the documentation of the
-            `from_json` method
-    """
-    if (not isinstance(workflow, _workflow)):
-        raise ValueError("invalid value type for workflow")
-
-    data = {
-        "workflow": {
-            "name": workflow.name
-        },
-        "jobs": []
-    }
-
-    for job_id in sorted(workflow.list_jobs(outdated_only = outdated_only)):
-        job_inputs, job_outputs = workflow.job_inputs_and_outputs(job_id)
-        data["jobs"].append(collections.OrderedDict((
-            ("id", job_id),
-            ("inputs", job_inputs),
-            ("outputs", job_outputs),
-            ("template", workflow.job_template(job_id)),
-            ("data", workflow.job_data(job_id)),
-        )))
-
-    return data
-
-def save (workflow, output_file, outdated_only = True):
-    """ Export a workflow as a JSON-formatted file
-
-        Arguments:
-            workflow (object): a workflow object
-            output_file (str or file object): the name of a JSON-formatted
-                output file, or a file object open in writing mode
-            outdated_only (boolean, optional): if set to True, will only export
-                jobs that need to be re-run; if False, all jobs are exported
-
-        Returns:
-            nothing
-
-        Notes:
-        [1] The JSON file is formatted as shown in the documentation of the
-            `from_json` method
-    """
-    if (utils.is_string(output_file)):
-        if (output_file.lower().endswith(".gz")):
-            fh = gzip.open(output_file, "wb")
-        else:
-            fh = open(output_file, 'w')
-    else:
-        fh = output_file
-
-    json.dump(
-        to_json(workflow, outdated_only),
-        fh,
-        indent = 4,
-        separators = (',', ': '))

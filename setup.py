@@ -37,7 +37,7 @@ try:
         # Package components
         packages = [
             _PACKAGE_NAME,
-            _PACKAGE_NAME + ".exporters",
+            _PACKAGE_NAME + ".io",
         ],
         package_dir = {
             _PACKAGE_NAME: "lib"

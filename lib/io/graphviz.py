@@ -1,6 +1,10 @@
 
 from .. import core
 from .. import utils
+from .. import errors
+
+import re
+import os
 
 __all__ = (
     "draw",
@@ -80,6 +84,9 @@ _GRAPHVIZ_PATH_NODE_FGCOLOR = {
     core.PATH_STATUS.OUTDATED: (255, 204, 153),  # pale orange
 }
 
+_GRAPHVIZ_FORMAT_ERROR = re.compile(
+    "Format: \"(.+?)\" not recognized\. Use one of: (.*)")
+
 def draw (workflow, filename, outdated_only = True, decorated = True,
     prog = "dot"):
     """ Export a workflow as a picture, in any format supported by Graphviz
@@ -146,4 +153,20 @@ def draw (workflow, filename, outdated_only = True, decorated = True,
                 "invalid pygraphviz object: missing key '%s' for node %s" % (
                     e.args[0], node))
 
-    g.draw(filename, prog = prog)
+    try:
+        g.draw(filename, prog = prog)
+
+    except IOError as e:
+        m = _GRAPHVIZ_FORMAT_ERROR.match(str(e))
+        if (m is not None):
+            original_format = m.group(1)
+            allowed_formats = m.group(2).split()
+
+            if (os.path.exists(filename)):
+                os.remove(filename)
+
+            raise errors.SpateException(
+                "unknown format '%s'; accepted formats are %s" % (
+                    original_format, ', '.join(allowed_formats)))
+        else:
+            raise e
