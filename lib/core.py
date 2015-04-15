@@ -32,12 +32,12 @@ class _NODE_TYPE (enum.Enum):
 class _workflow:
     """ Simple representation of a file-based data processing workflow
     """
-    def __init__ (self, workflow_name = None):
-        if (workflow_name is None):
-            workflow_name = utils.random_string()
+    def __init__ (self, name = None):
+        if (name is None):
+            name = utils.random_string()
 
-        self._graph = networkx.DiGraph(name = workflow_name)
-        logger.debug("created a new workflow with name '%s'" % workflow_name)
+        self._graph = networkx.DiGraph(name = name)
+        logger.debug("created a new workflow with name '%s'" % name)
 
     def get_name (self):
         """ Return the workflow name
@@ -54,11 +54,11 @@ class _workflow:
         """
         return self._graph.graph["name"]
 
-    def set_name (self, workflow_name):
+    def set_name (self, name):
         """ Set the workflow name
 
             Arguments:
-                workflow_name (str): new name for the workflow
+                name (str): new name for the workflow
 
             Returns:
                 nothing
@@ -67,8 +67,8 @@ class _workflow:
             [1] The name of a given workflow object can also be modified
                 by using the dedicated setter function 'name'
         """
-        self._graph.graph["name"] = workflow_name
-        logger.debug("workflow name set to '%s'" % workflow_name)
+        self._graph.graph["name"] = name
+        logger.debug("workflow name set to '%s'" % name)
 
     name = property(get_name, set_name)
 
@@ -80,7 +80,7 @@ class _workflow:
         return job_node_key
 
     def add_job (self, inputs = None, outputs = None, template = None,
-        job_id = None, **kwargs):
+        job_id = None, **job_data):
         """ Add a job to this workflow
 
             Arguments:
@@ -90,8 +90,8 @@ class _workflow:
                     or directories) this job accepts as output, if any
                 template (str, optional): template for the job code
                 job_id (str, optional): unique identifier for this job
-                kwargs (dict, optional): additional variables for this job;
-                    these variables will be accessible to the job template
+                job_data (dict, optional): additional variables for this job;
+                    these variables will be accessible from the job template
 
             Returns:
                 str: job identifier
@@ -108,11 +108,6 @@ class _workflow:
             [5] A job cannot add a cycle in the overall directed acyclic graph
                 of jobs and their associated paths; if this situation occurs a
                 SpateException will be thrown, and the job ignored
-            [6] The job template will always receive the variables INPUTN and
-                OUTPUTN, which contains the number of input and output paths,
-                respectively, and the paths themselves as variables INPUTx and
-                OUTPUTy with x being betwen 0 and INPUTN-1 and y being between 0
-                and OUTPUTN-1, respectively.
         """
         input_paths = utils.ensure_iterable(inputs)
         output_paths = utils.ensure_iterable(outputs)
@@ -122,6 +117,7 @@ class _workflow:
             job_id = "JOB_%d" % (len(filter(
                 lambda (node_type, node): (node_type == _NODE_TYPE.JOB),
                 self._graph.nodes_iter())) + 1)
+
         elif (not utils.is_string(job_id)):
             raise ValueError("invalid value for job_id: %s (type: %s)" % (
                 job_id, type(job_id)))
@@ -138,7 +134,8 @@ class _workflow:
 
         # constraint: a job must have at least one input or output
         if (len(input_paths) == 0) and (len(output_paths) == 0):
-            raise errors.SpateException("job '%s' has no input nor output" % job_id)
+            raise errors.SpateException(
+                "job '%s' has no input nor output" % job_id)
 
         # constraint: any given path is the product of at most one job
         for output_path in output_paths:
@@ -150,10 +147,15 @@ class _workflow:
                     "path '%s' is already created by job '%s'" % (
                     output_path, producing_job_id))
 
-        self._graph.add_node(
-            job_node_key,
-            _template = template,
-            _data = kwargs)
+        try:
+            self._graph.add_node(job_node_key)
+
+            self.set_job_template(job_id, template)
+            self.set_job_data(job_id, **job_data)
+
+        except Exception as e:
+            self._graph.remove_node(job_node_key)
+            raise e
 
         for (n, input_path) in enumerate(input_paths):
             self._graph.add_edge(
@@ -191,10 +193,11 @@ class _workflow:
             [1] A SpateException will be raised if the job doesn't exist
         """
         job_node_key = self._ensure_existing_job(job_id)
-        input_paths, output_paths = self.job_inputs_and_outputs(job_id)
+        input_paths, output_paths = self.get_job_inputs_and_outputs(job_id)
 
         # remove the job node itself, then
         self._graph.remove_node(job_node_key)
+        logger.debug("job '%s' removed" % job_id)
 
         # remove any input or output path
         # that would be left disconnected
@@ -203,14 +206,13 @@ class _workflow:
             if (path_node_key in self._graph) and \
                (self._graph.degree(path_node_key) == 0):
                 self._graph.remove_node(path_node_key)
-
-        logger.debug("job '%s' removed" % job_id)
+                logger.debug("removed orphan path '%s'" % path)
 
     def has_job (self, job_id):
         """ Test if a job is part of this workflow
 
             Arguments:
-                job_id (str): identifier of the job
+                job_id (str): job identifier
 
             Returns:
                 boolean: True if a job exists with this identifier,
@@ -302,7 +304,7 @@ class _workflow:
         # (2) identify jobs that need to be re-run, either...
         outdated_paths = {}  # paths that will be re-generated by another job
         for job_id in job_identifiers:
-            input_paths, output_paths = self.job_inputs_and_outputs(job_id)
+            input_paths, output_paths = self.get_job_inputs_and_outputs(job_id)
 
             paths_status = {}
             depends_on_prior_jobs = False
@@ -381,11 +383,11 @@ class _workflow:
                     tuple([(output_path, paths_status[output_path]) \
                         for output_path in output_paths]))
 
-    def job_inputs_and_outputs (self, job_id):
+    def get_job_inputs_and_outputs (self, job_id):
         """ Return input and output paths associated with a job, if any
 
             Arguments:
-                job_id (str): identifier of the job
+                job_id (str): job identifier
 
             Returns:
                 list of str: list of input paths (or empty list)
@@ -410,11 +412,11 @@ class _workflow:
             tuple([output_path for (_, output_path) in sorted(output_paths)])
         )
 
-    def job_template (self, job_id):
+    def get_job_template (self, job_id):
         """ Return the template associated with a job, if any
 
             Arguments:
-                job_id (str): identifier of the job
+                job_id (str): job identifier
 
             Returns:
                 str: template associated with this job
@@ -425,20 +427,94 @@ class _workflow:
         job_node_key = self._ensure_existing_job(job_id)
         return self._graph.node[job_node_key]["_template"]
 
-    def job_data (self, job_id):
-        """ Return data associated with a job, if any
+    def set_job_template (self, job_id, template):
+        """ Set or update a template associated with a job
 
             Arguments:
-                job_id (str): identifier of the job
+                job_id (str): job identifier
+                template (str): job template
 
             Returns:
-                dict: data associated with this job
+                nothing
 
             Notes:
             [1] A SpateException will be raised if the job doesn't exist
         """
         job_node_key = self._ensure_existing_job(job_id)
-        return self._graph.node[job_node_key]["_data"]
+
+        if (template is not None) and (not utils.is_string(template)):
+            raise ValueError("invalid type for template (should be str): %s" %
+                type(template))
+
+        self._graph.node[job_node_key]["_template"] = template
+
+    def get_job_data (self, job_id):
+        """ Return a copy of the data associated with a job, if any
+
+            Arguments:
+                job_id (str): identifier of the job
+
+            Returns:
+                dict: copy of the data associated with this job
+
+            Notes:
+            [1] A SpateException will be raised if the job doesn't exist
+        """
+        job_node_key = self._ensure_existing_job(job_id)
+        return self._graph.node[job_node_key]["_data"].copy()
+
+    def set_job_data (self, job_id, **job_data):
+        """ Set data associated with a job
+
+            Arguments:
+                job_id (str): identifier of the job
+                **job_data (dict): data for this job
+
+            Returns:
+                nothing
+
+            Notes:
+            [1] A SpateException will be raised if the job doesn't exist
+        """
+        job_node_key = self._ensure_existing_job(job_id)
+        self._graph.node[job_node_key]["_data"] = job_data
+
+    def __eq__ (self, obj):
+        if (not isinstance(obj, self.__class__)):
+            return False
+
+        if (self.name != obj.name):
+            return False
+
+        if (self.number_of_jobs != obj.number_of_jobs) or \
+           (self.number_of_paths != obj.number_of_paths):
+            return False
+
+        list_jobs = lambda obj: sorted(obj.list_jobs(
+            outdated_only = False, with_paths = True))
+
+        for (job_id_a, input_paths_a, output_paths_a), \
+            (job_id_b, input_paths_b, output_paths_b) in \
+            zip(list_jobs(self), list_jobs(obj)):
+            if (job_id_a != job_id_b):
+                return False
+
+            if (sorted(input_paths_a) != sorted(input_paths_b)) or \
+               (sorted(output_paths_a) != sorted(output_paths_b)):
+                return False
+
+            if (self.get_job_template(job_id_a) != \
+                obj.get_job_template(job_id_b)):
+                return False
+
+            if (self.get_job_data(job_id_a) != \
+                obj.get_job_data(job_id_b)):
+                return False
+
+        return True
+
+    def __ne__ (self, obj):
+        return not self.__eq__(obj)
 
     def __add__ (self, obj):
         if (not isinstance(obj, self.__class__)):

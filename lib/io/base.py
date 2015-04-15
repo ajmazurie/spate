@@ -7,7 +7,9 @@ import collections
 import json
 import yaml
 import gzip
+import bz2
 import enum
+import logging
 
 __all__ = (
     "from_json",
@@ -16,6 +18,49 @@ __all__ = (
     "to_json",
     "to_yaml",
     "save")
+
+logger = logging.getLogger(__name__)
+
+def _stream_reader (source):
+    if (source is None):
+        return sys.stdin
+
+    elif (utils.is_string(source)):
+        if (source.lower().endswith(".gz")):
+            return gzip.open(source, "rb")
+        elif (source.lower().endswith(".bz2")):
+            return bz2.BZ2File(source, "r")
+        else:
+            return open(source, "rU")
+
+    elif (hasattr(source, "read")):
+        return source
+
+    raise ValueError("invalid source object %s (type: %s)" % (
+        source, type(source)))
+
+def _stream_writer (target):
+    if (target is None):
+        return sys.stdout
+
+    elif (utils.is_string(target)):
+        if (target.lower().endswith(".gz")):
+            return gzip.open(target, "wb")
+        elif (target.lower().endswith(".bz2")):
+            return bz2.BZ2File(target, "w")
+        else:
+            return open(target, "w")
+
+    elif (hasattr(target, "write")):
+        return target
+
+    raise ValueError("invalid target object %s (type: %s)" % (
+        target, type(target)))
+
+def _ensure_workflow (obj):
+    if (not isinstance(obj, core._workflow)):
+        raise ValueError("invalid value for workflow: %s (type: %s)" % (
+            obj, type(obj)))
 
 def from_json (data):
     """ Create a new workflow object from a JSON object
@@ -72,9 +117,7 @@ def to_json (workflow, outdated_only = True):
         [1] The JSON document is formatted as shown in the documentation of the
             `from_json` method
     """
-    if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value for workflow: %s (type: %s)" % (
-            workflow, type(workflow)))
+    _ensure_workflow(workflow)
 
     data = {
         "workflow": {
@@ -84,7 +127,7 @@ def to_json (workflow, outdated_only = True):
     }
 
     for job_id in sorted(workflow.list_jobs(outdated_only = outdated_only)):
-        job_inputs, job_outputs = workflow.job_inputs_and_outputs(job_id)
+        job_inputs, job_outputs = workflow.get_job_inputs_and_outputs(job_id)
         job_entry = collections.OrderedDict(id = job_id)
 
         if (len(job_inputs) > 0):
@@ -93,11 +136,11 @@ def to_json (workflow, outdated_only = True):
         if (len(job_outputs) > 0):
             job_entry["outputs"] = job_outputs
 
-        job_template = workflow.job_template(job_id)
+        job_template = workflow.get_job_template(job_id)
         if (job_template is not None) and (job_template.strip() != ''):
             job_entry["template"] = job_template
 
-        job_data = workflow.job_data(job_id)
+        job_data = workflow.get_job_data(job_id)
         if (len(job_data) > 0):
             job_entry["data"] = job_data
 
@@ -162,31 +205,27 @@ def to_yaml (workflow, outdated_only = True):
 
 #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-def load (input_file):
+def load (source):
     """ Create a new workflow object from a JSON- or YAML-formatted file
 
         Arguments:
-            input_file (str or file object): the name of the JSON- or YAML-
+            source (str or file object): the name of the JSON- or YAML-
                 formatted file, or a file object open in reading mode
 
         Returns:
             object: a workflow object
 
         Notes:
-        [1] The JSON-formatted file must comply to the schema shown in the
+        [1] If the source is a string with extension '.gz' or '.bz2', the
+            corresponding file will be decompressed with the GZip or BZip2
+            algorithm, respectively
+        [2] The JSON-formatted file must comply to the schema shown in the
             documentation of the `from_json` method
-        [2] The YAML-formatted file must comply to the schema shown in the
+        [3] The YAML-formatted file must comply to the schema shown in the
             documentation of the `from_yaml` method
     """
-    if (utils.is_string(input_file)):
-        if (input_file.lower().endswith(".gz")):
-            fh = gzip.open(input_file, "rb")
-        else:
-            fh = open(input_file, "rU")
-    else:
-        fh = input_file
-
-    raw_data, data = fh.read(), None
+    i_fh = _stream_reader(source)
+    raw_data, data = i_fh.read(), None
 
     try:
         data = json.loads(raw_data)
@@ -199,7 +238,7 @@ def load (input_file):
         pass
 
     if (data is None):
-        raise errors.SpateException("unknown format for input %s" % input_file)
+        raise errors.SpateException("unknown format for input %s" % source)
 
     return from_json(data)
 
@@ -207,13 +246,13 @@ class _FILE_FORMAT (enum.Enum):
     JSON = 0
     YAML = 1
 
-def save (workflow, output_file, outdated_only = True):
+def save (workflow, target, outdated_only = True):
     """ Export a workflow as a JSON or YAML-formatted file
 
         Arguments:
             workflow (object): a workflow object
-            output_file (str or file object): the name of an output file, or
-                a file object open in writing mode
+            target (str or file object): the name of an output file,
+                or a file object open in writing mode
             outdated_only (boolean, optional): if set to True, will only export
                 jobs that need to be re-run; if False, all jobs are exported
 
@@ -221,27 +260,23 @@ def save (workflow, output_file, outdated_only = True):
             nothing
 
         Notes:
-        [1] The output file will be compressed if its name ends with '.gz'
-        [2] The format of the output file will be set based on the filename, if
-            possible; e.g., a '.json' or '.json.gz' extension will produce a
+        [1] If the target is a string with extension '.gz' or '.bz2', the
+            corresponding file will be compressed with the GZip or BZip2
+            algorithm, respectively
+        [2] The format of the output will be set based on the filename, if
+            available; e.g., a '.json' or '.json.gz' extension will produce a
             JSON file, while '.yaml' or '.yaml.gz' will produce a YAML file. If
             no extension is provided JSON is selected as the default format
     """
+    data = to_json(workflow, outdated_only)
+
+    o_fh = _stream_writer(target)
     o_format = _FILE_FORMAT.JSON
 
-    if (utils.is_string(output_file)):
-        if (output_file.lower().endswith(".gz")):
-            o_fh = gzip.open(output_file, "wb")
-        else:
-            o_fh = open(output_file, 'w')
-
-        if (output_file.lower().endswith(".yaml") or \
-            output_file.lower().endswith(".yaml.gz")):
+    if (utils.is_string(target)):
+        if (target.lower().endswith(".yaml") or \
+            target.lower().endswith(".yaml.gz")):
             o_format = _FILE_FORMAT.YAML
-    else:
-        o_fh = output_file
-
-    data = to_json(workflow, outdated_only)
 
     if (o_format == _FILE_FORMAT.JSON):
         json.dump(data, o_fh,

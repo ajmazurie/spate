@@ -1,35 +1,61 @@
 
 from .. import utils
+from .. import templates
+from base import _ensure_workflow, _stream_writer
 
 import os
+import logging
 
 __all__ = (
     "to_drake",)
 
-def to_drake (workflow, filename, jobs_factory, outdated_only = True):
-    """ Export a workflow as a Drake script
-    """
-    if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value type for workflow")
+logger = logging.getLogger(__name__)
 
-    o = open(filename, "w")
+def to_drake (workflow, target, outdated_only = True):
+    """ Export a workflow as a Drake script
+
+        Arguments:
+            workflow (object): a workflow object
+            target (str or object): either a filename, or a file object open
+                in writing mode
+            outdated_only (boolean, optional): if set to True (default), will
+                only export outdated jobs rather than all existing jobs
+
+        Returns:
+            int: number of jobs exported
+
+        Notes:
+        [1] If no job is found in the workflow, no file will be created
+    """
+    _ensure_workflow(workflow)
+
+    jobs = workflow.list_jobs(
+        outdated_only = outdated_only,
+        with_paths = True)
+
+    o_fh = _stream_writer(target)
+    logger.debug("exporting %s to %s" % (workflow, o_fh))
 
     n_jobs = 0
-    for job in utils.build_jobs(
-        workflow, jobs_factory, outdated_only = outdated_only):
-        job_id, job_inputs, job_outputs, body, _ = job
+    for (job_id, input_paths, output_paths) in jobs:
+        # note: Drake doesn't allow empty lines
+        body = '\n\t'.join(utils.dedent_text_block(
+            templates.render_job(workflow, job_id),
+            ignore_empty_lines = True))
 
-        o.write("; %s\n%s <- %s\n\t%s\n\n" % (
+        o_fh.write("; %s\n%s <- %s\n\t%s\n\n" % (
             job_id,
-            ', '.join(job_outputs),
-            ', '.join(job_inputs),
-            '\n\t'.join(utils.dedent_text_block(body, True))
-        ))
+            ', '.join(output_paths),
+            ', '.join(input_paths),
+            body))
         n_jobs += 1
 
-    o.close()
+    logger.debug("%d jobs exported" % n_jobs)
 
-    if (n_jobs == 0):
-        os.remove(filename)
+    if (n_jobs == 0) and (utils.is_string(target)):
+        logger.debug("removing named output file '%s'" % target)
+
+        o_fh.close()
+        os.remove(target)
 
     return n_jobs

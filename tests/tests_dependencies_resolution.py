@@ -1,8 +1,7 @@
 """ Tests of the job dependency resolution algorithms
 
-    TODO:
-    - test list_jobs() with temporary files
-    - test list_jobs() with a pre-generated DAG
+    TODO: test list_jobs() with temporary files
+    TODO: test list_jobs() with a pre-generated DAG
 """
 
 import spate

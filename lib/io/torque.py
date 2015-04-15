@@ -1,32 +1,37 @@
 # Export a workflow as a TORQUE/PBS array
 
-from .. import core
 from .. import utils
 from .. import templates
+from base import _ensure_workflow
 
 import os
+import logging
 
 __all__ = (
     "to_torque_array",)
 
-def to_torque_array (workflow, filenames_prefix,
-    outdated_only = True, **qsub_kwargs):
-    """ Export a workflow as a TORQUE/PBS array, in which jobs will run in parallel
-    """
-    if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value for workflow: %s (type %s)" % (
-            workflow, type(workflow)))
+logger = logging.getLogger(__name__)
 
-    torque_jobs_fn = filenames_prefix + ".torque_jobs"
+def to_torque_array (workflow, output_prefix,
+    outdated_only = True, **qsub_kwargs):
+    """ Export a workflow as a TORQUE/PBS array
+
+    """
+    _ensure_workflow(workflow)
+
+    torque_jobs_fn = output_prefix + ".torque_jobs"
     torque_jobs_fh = open(torque_jobs_fn, "w")
 
+    jobs = workflow.list_jobs(
+        outdated_only = outdated_only,
+        with_descendants = False)
+
     n_jobs = 0
-    for job_id in workflow.list_jobs(
-        outdated_only = outdated_only, with_descendants = False):
+    for job_id in jobs:
         body = utils.flatten_text_block(
             templates.render_job(workflow, job_id))
 
-        torque_jobs_fh.write(utils.flatten_text_block(body) + '\n')
+        torque_jobs_fh.write(body + '\n')
         n_jobs += 1
 
     torque_jobs_fh.close()
@@ -64,7 +69,7 @@ def to_torque_array (workflow, filenames_prefix,
 
     qsub_args = '\n'.join(qsub_args)
 
-    torque_array_fn = filenames_prefix + ".torque_array"
+    torque_array_fn = output_prefix + ".torque_array"
     torque_array_fh = open(torque_array_fn, "w")
 
     torque_array_fh.write("""\

@@ -2,13 +2,17 @@
 from .. import core
 from .. import utils
 from .. import templates
+from base import _ensure_workflow, _stream_writer
 
 import sys
 import os
+import logging
 
 __all__ = (
     "echo",
     "to_shell_script",)
+
+logger = logging.getLogger(__name__)
 
 def echo (workflow, outdated_only = True, decorated = True, colorized = True,
     with_suffix = False, stream = sys.stdout):
@@ -17,7 +21,7 @@ def echo (workflow, outdated_only = True, decorated = True, colorized = True,
         Arguments:
             workflow (object): a workflow object
             outdated_only (boolean, optional): if set to True (default), will
-                only print outdated jobs rather than all jobs
+                export outdated jobs only, rather than all jobs in the workflow
             decorated (boolean, optional): if set to True, will highlight
                 the job names and dim the input paths on ANSI terminals
             colorized (boolean, optional): if set to True, will add colors
@@ -35,9 +39,8 @@ def echo (workflow, outdated_only = True, decorated = True, colorized = True,
         [1] For the `decorated` or `colorized` arguments to work, Colorama must
             be installed; see https://pypi.python.org/pypi/colorama
     """
-    if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value for workflow: %s (type %s)" % (
-            workflow, type(workflow)))
+    _ensure_workflow(workflow)
+    stream = _stream_writer(stream)
 
     _TERMINAL_JOB_LINE_SUFFIX = {
         core.JOB_STATUS.CURRENT: '',
@@ -142,15 +145,15 @@ def echo (workflow, outdated_only = True, decorated = True, colorized = True,
 
     return n_jobs
 
-def to_shell_script (workflow, filename, outdated_only = True,
+def to_shell_script (workflow, target, outdated_only = True,
     shell = "/bin/bash", shell_args = []):
     """ Export a workflow as a shell script
 
         Arguments:
             workflow (object): a workflow object
-            filename (str): the name of the shell script
+            target (str or obj): the name of a shell script, or a file object
             outdated_only (boolean, optional): if set to True (default), will
-                only export outdated jobs rather than all jobs
+                export outdated jobs only, rather than all jobs in the workflow
             shell (str, optional): path to the shell to use; if none provided
                 then /bin/bash is used by default
             shell_args (str or list of str, optional): options for the shell,
@@ -163,24 +166,25 @@ def to_shell_script (workflow, filename, outdated_only = True,
         [1] The shell script will run the jobs sequentially; the jobs are
             ordered to ensure that the input paths of any given job have
             been produced by one or more previous jobs, if any
-        [2] The mode of the output file will be set to 755 (or rwxr-xr-x)
+        [2] The mode of the output file will be set to 755 (or rwxr-xr-x) if a
+            string is provided for `target`
         [3] It is strongly advised, when using the default /bin/bash shell, to
             use the "set -e" argument ('errexit', see bash documentation) so
             that any job returning a non-zero exit code aborts the workflow
         [4] If no job is found in the workflow, no file will be created
     """
-    if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value for workflow: %s (type %s)" % (
-            workflow, type(workflow)))
+    _ensure_workflow(workflow)
 
-    o = open(filename, "w")
-    o.write("#%s\n" % shell.strip())
+    o_fh = _stream_writer(target)
+    logger.debug("exporting %s to %s" % (workflow, o_fh))
+
+    o_fh.write("#!%s\n" % shell.strip())
 
     shell_args = utils.ensure_iterable(shell_args)
     if (len(shell_args) > 0):
-        o.write('\n')
+        o_fh.write('\n')
         for shell_arg in shell_args:
-            o.write("%s\n" % str(shell_arg).strip())
+            o_fh.write("%s\n" % str(shell_arg).strip())
 
     n_jobs = 0
     for job_id in workflow.list_jobs(outdated_only = outdated_only):
@@ -188,13 +192,18 @@ def to_shell_script (workflow, filename, outdated_only = True,
             templates.render_job(workflow, job_id),
             ignore_empty_lines = False)
 
-        o.write("\n# %s\n%s\n" % (job_id, '\n'.join(body)))
+        o_fh.write("\n# %s\n%s\n" % (job_id, '\n'.join(body)))
         n_jobs += 1
 
-    o.close()
-    os.chmod(filename, 0755)
+    logger.debug("%d jobs exported" % n_jobs)
 
-    if (n_jobs == 0):
-        os.remove(filename)
+    if (utils.is_string(target)):
+        os.chmod(target, 0755)
+
+        if (n_jobs == 0):
+            logger.debug("removing named output file '%s'" % target)
+
+            o_fh.close()
+            os.remove(target)
 
     return n_jobs

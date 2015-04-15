@@ -1,13 +1,16 @@
 # Export a workflow as a SLURM job array
 
-from .. import core
 from .. import utils
 from .. import templates
+from base import _ensure_workflow
 
 import os
+import logging
 
 __all__ = (
     "to_slurm_array",)
+
+logger = logging.getLogger(__name__)
 
 _SBATCH_LONG_OPTIONS = {
     "a": "array",
@@ -51,20 +54,22 @@ def _slurm_flag_mapper (flag):
     else:
         return flag
 
-def to_slurm_array (workflow, filenames_prefix,
+def to_slurm_array (workflow, output_prefix,
     outdated_only = True, **sbatch_kwargs):
-    """ Export a workflow as a SLURM array, in which jobs will run in parallel
-    """
-    if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value for workflow: %s (type %s)" % (
-            workflow, type(workflow)))
+    """ Export a workflow as a SLURM array
 
-    slurm_jobs_fn = filenames_prefix + ".slurm_jobs"
+    """
+    _ensure_workflow(workflow)
+
+    slurm_jobs_fn = output_prefix + ".slurm_jobs"
     slurm_jobs_fh = open(slurm_jobs_fn, "w")
 
+    jobs = workflow.list_jobs(
+        outdated_only = outdated_only,
+        with_descendants = False)
+
     n_jobs = 0
-    for job_id in workflow.list_jobs(
-        outdated_only = outdated_only, with_descendants = False):
+    for job_id in jobs:
         body = utils.flatten_text_block(
             templates.render_job(workflow, job_id))
 
@@ -97,7 +102,7 @@ def to_slurm_array (workflow, filenames_prefix,
 
     sbatch_args = '\n'.join(sbatch_args)
 
-    slurm_array_fn = filenames_prefix + ".slurm_array"
+    slurm_array_fn = output_prefix + ".slurm_array"
     slurm_array_fh = open(slurm_array_fn, "w")
 
     slurm_array_fh.write("""\

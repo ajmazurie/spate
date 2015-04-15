@@ -9,6 +9,7 @@ __all__ = (
     "set_template_engine",
     "get_template_engine",
     "set_template_variable",
+    "set_template_variables",
     "get_template_variable",
     "del_template_variable",
     "render_job",
@@ -16,44 +17,104 @@ __all__ = (
     "mustache_engine",)
 
 def _ensure_template_engine (obj):
-    if (not utils.is_class(obj)) or (not issubclass(obj, _base_template_engine)):
+    if (not utils.is_class(obj)) or \
+       (not issubclass(obj, _base_template_engine)):
         raise ValueError(
             "invalid value type for engine: %s (type %s)" % (obj, type(obj)))
 
 _current_template_engine = None
 
-def set_template_engine (template_engine):
-    global _current_template_engine
-    _ensure_template_engine(template_engine)
-    _current_template_engine = template_engine
-
 def get_template_engine():
+    """ Return the template engine for all jobs
+
+        Arguments:
+            nothing
+
+        Returns:
+            obj: template engine class
+    """
     return _current_template_engine
+
+def set_template_engine (template_engine):
+    """ Set the template engine for all jobs
+
+        Arguments:
+            template_engine (obj): template engine class
+
+        Notes:
+        [1] `template_engine` must be a subclass of
+            `spate.templates._base_template_engine`
+    """
+    global _current_template_engine
+    if (template_engine is None):
+        _current_template_engine = default_engine
+    else:
+        _ensure_template_engine(template_engine)
+        _current_template_engine = template_engine
 
 _global_template_variables = {}
 
-def set_template_variable (**kwargs):
-    """ Set one or more variables for all job templates
+def set_template_variable (name, value):
+    """ Set a variable that all job templates can access
+
+        Arguments:
+            name (str): name of the variable
+            value (obj): value for this variable
+
+        Returns:
+            nothing
 
         Notes:
-        [1] These variables may be overwritten by job-specific ones
+        [1] This variable will be overwritten by an existing job-specific
+            variable with the same name, if any
+    """
+    if (not utils.is_string(name)):
+        raise ValueError(
+            "invalid type for name (should be str): %s" % type(name))
+
+    _global_template_variables[name] = value
+
+def set_template_variables (**kwargs):
+    """ Set one or more variables that all job templates can access
+
+        Arguments:
+            **kwargs (dict): keys and values
+
+        Returns:
+            nothing
+
+        Notes:
+        [1] These variables will be overwritten by existing job-specific
+            variables with the same name, if any
     """
     for k, v in kwargs.iteritems():
-        _global_template_variables[k] = v
+        set_template_variable(k, v)
 
 def get_template_variable (name):
-    """ Return the value of a variable that has been set for all job templates
+    """ Return the value of a variable set for all job templates
+
+        Arguments:
+            name (str): name of the variable
+
+        Returns:
+            obj: value for this variable
     """
     return _global_template_variables[name]
 
 def del_template_variable (name):
-    """ Delete a variable from those accessible to all job templates
+    """ Delete a variable from those set for all job templates
+
+        Arguments:
+            name (str): name of the variable
+
+        Returns:
+            nothing
     """
     del _global_template_variables[name]
 
 def render_job (workflow, job_id, template_engine = None):
     if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value type for workflow: %s (type %s)" % (
+        raise ValueError("invalid value for workflow: %s (type %s)" % (
             workflow, type(workflow)))
 
     if (template_engine is None):
@@ -61,14 +122,16 @@ def render_job (workflow, job_id, template_engine = None):
     else:
         _ensure_template_engine(template_engine)
 
-    job_template = workflow.job_template(job_id)
+    job_template = workflow.get_job_template(job_id)
 
     # set up the job environment
-    job_env = {k: v for k, v in _global_template_variables.iteritems()}
-    for k, v in workflow.job_data(job_id).iteritems():
+    job_env = {}
+    for k, v in _global_template_variables.iteritems():
+        job_env[k] = v
+    for k, v in workflow.get_job_data(job_id).iteritems():
         job_env[k] = v
 
-    job_inputs, job_outputs = workflow.job_inputs_and_outputs(job_id)
+    job_inputs, job_outputs = workflow.get_job_inputs_and_outputs(job_id)
 
     for (prefix, paths) in (("INPUT", job_inputs), ("OUTPUT", job_outputs)):
         job_env[prefix + 'S'] = paths
@@ -134,6 +197,11 @@ class mustache_engine (_base_template_engine):
             template = "{{#OUTPUTS}}touch \"{{.}}\"\n{{/OUTPUTS}}"
 
         pystache = utils.ensure_module("pystache")
+
+        # the following overrides the HTML tag escaping performed by
+        # pystache, since it affects the quotes in job body content
+        pystache.defaults.TAG_ESCAPE = lambda u: u
+
         return pystache.render(template, kwargs)
 
 set_template_engine(default_engine)
