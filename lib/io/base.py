@@ -74,17 +74,17 @@ def from_json (data):
         Notes:
         [1] The JSON document must comply to the following schema:
             {
-                "workflow": str  # name of the workflow
-                "jobs": [  # list of jobs
-                    {
-                        "id": str,  # job name
-                        "inputs": list of str,  # list of input paths (optional)
-                        "outputs": list of str,  # list of output paths (optional)
-                        "template": str,  # job template (optional)
-                        "data": dict,  # data associated with this job (optional)
-                    },
-                    ...
-                ]
+              "workflow": str  # name of the workflow
+              "jobs": [  # list of jobs
+                {
+                  "id": str,  # job name
+                  "inputs": list of str,  # list of input paths (optional)
+                  "outputs": list of str,  # list of output paths (optional)
+                  "template": str,  # job template (optional)
+                  "data": dict,  # data associated with this job (optional)
+                },
+                ...
+              ]
             }
     """
     try:
@@ -127,7 +127,7 @@ def to_json (workflow, outdated_only = True):
     }
 
     for job_id in sorted(workflow.list_jobs(outdated_only = outdated_only)):
-        job_inputs, job_outputs = workflow.get_job_inputs_and_outputs(job_id)
+        job_inputs, job_outputs = workflow.get_job_paths(job_id)
         job_entry = collections.OrderedDict(id = job_id)
 
         if (len(job_inputs) > 0):

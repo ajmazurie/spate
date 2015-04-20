@@ -6,7 +6,7 @@ With **Spate** you declare your jobs as accepting input *paths* (i.e., files or 
 
 **Spate** can manage job dependencies regardless of the size or complexity of your workflow. If a job flagged for execution produces files that are used by other jobs, these jobs will also be flagged for execution.
 
-Finally, **Spate** knows how to run your workflow on various software platforms, including a plain shell script, existing workflow systems such as [Makeflow](http://ccl.cse.nd.edu/software/makeflow/), [Drake](https://github.com/Factual/drake) and [Pegasus](http://pegasus.isi.edu/), or job schedulers such as [TORQUE/PBS](http://www.adaptivecomputing.com/products/open-source/torque/) and [SLURM](http://slurm.schedmd.com/). You only need to call a simple function to export an existing **Spate** workflow to any of these platforms; **Spate** will deal with the messy details for you.
+Finally, **Spate** knows how to run your workflow on various software platforms, including a plain shell script, existing workflow systems such as [Makeflow](http://ccl.cse.nd.edu/software/makeflow/), [Drake](https://github.com/Factual/drake), or job schedulers such as [TORQUE/PBS](http://www.adaptivecomputing.com/products/open-source/torque/) and [SLURM](http://slurm.schedmd.com/). You only need to call a simple function to export an existing **Spate** workflow to any of these platforms; **Spate** will deal with the messy details for you.
 
 ## Installation
 

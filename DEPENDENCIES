@@ -1,3 +1,6 @@
-networkx
+colorama
 enum34
+networkx
+pygraphviz
+pystache
 pyyaml

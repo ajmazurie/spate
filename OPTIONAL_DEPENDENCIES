@@ -1,5 +1,0 @@
-# optional requirements; to install, type 'pip install -r OPTIONAL_DEPENDENCIES'
-
-colorama  # for spate.to_terminal(with_colors = True)
-pystache  # for spate.set_template_engine(spate.mustache_engine)
-pygraphviz  # for spate.to_graphviz() and spate.draw()

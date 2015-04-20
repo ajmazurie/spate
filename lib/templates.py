@@ -131,7 +131,7 @@ def render_job (workflow, job_id, template_engine = None):
     for k, v in workflow.get_job_data(job_id).iteritems():
         job_env[k] = v
 
-    job_inputs, job_outputs = workflow.get_job_inputs_and_outputs(job_id)
+    job_inputs, job_outputs = workflow.get_job_paths(job_id)
 
     for (prefix, paths) in (("INPUT", job_inputs), ("OUTPUT", job_outputs)):
         job_env[prefix + 'S'] = paths

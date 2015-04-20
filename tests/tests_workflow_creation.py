@@ -15,7 +15,7 @@ class WorkflowCreationTests (unittest.TestCase):
         # a workflow name can be provided at creation
         workflow_name_1 = spate.utils.random_string()
 
-        workflow = spate.new_workflow(workflow_name = workflow_name_1)
+        workflow = spate.new_workflow(name = workflow_name_1)
         self.assertEqual(workflow.name, workflow_name_1)
 
         # a workflow name can be set and retrieved through the 'name' property
@@ -75,7 +75,7 @@ class WorkflowCreationTests (unittest.TestCase):
                 len(input_set) + len(output_set))
 
             # we should see these paths
-            inputs, outputs = workflow.get_job_inputs_and_outputs(dummy_job_id)
+            inputs, outputs = workflow.get_job_paths(dummy_job_id)
             self.assertEqual(inputs, tuple(input_set))
             self.assertEqual(outputs, tuple(output_set))
 
@@ -111,7 +111,7 @@ class WorkflowCreationTests (unittest.TestCase):
 
             self.assertEqual(job_id, "dummy-id")
 
-            inputs, outputs = workflow.get_job_inputs_and_outputs("dummy-id")
+            inputs, outputs = workflow.get_job_paths("dummy-id")
             self.assertEqual(inputs, ('a',))
             self.assertEqual(outputs, ('b',))
 

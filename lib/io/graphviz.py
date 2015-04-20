@@ -75,13 +75,13 @@ def to_graphviz (workflow, filename = None, outdated_only = True):
 
 _GRAPHVIZ_JOB_NODE_FGCOLOR = {
     core.JOB_STATUS.CURRENT:   (  0, 255,   0),  # bright green
-    core.JOB_STATUS.OUTDATED:  (255, 128,   0),  # bright orange
+    core.JOB_STATUS.OUTDATED:  (255,  64,   0),  # bright orange
 }
 
 _GRAPHVIZ_PATH_NODE_FGCOLOR = {
     core.PATH_STATUS.CURRENT:  (229, 255, 204),  # pale green
-    core.PATH_STATUS.MISSING:  (255, 153, 153),  # pale red
-    core.PATH_STATUS.OUTDATED: (255, 204, 153),  # pale orange
+    core.PATH_STATUS.MISSING:  (255, 140, 140),  # pale red
+    core.PATH_STATUS.OUTDATED: (255, 220,   0),  # pale yellow
 }
 
 _GRAPHVIZ_FORMAT_ERROR = re.compile(
