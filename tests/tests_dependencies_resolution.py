@@ -56,6 +56,20 @@ class DependenciesResolutionTests (unittest.TestCase):
         self.assertEqual(workflow.number_of_jobs, 2)
         self.assertEqual(workflow.number_of_paths, 3)
 
+    def test_predecessors_and_successors (self):
+        workflow = spate.new_workflow()
+
+        workflow.add_job(outputs = 'a', job_id = "dummy-1")
+        workflow.add_job(outputs = 'b', job_id = "dummy-2")
+        workflow.add_job(inputs = 'c', job_id = "dummy-3")
+        workflow.add_job(inputs = 'd', job_id = "dummy-4")
+        workflow.add_job(('a', 'b'), ('c', 'd'), job_id = "dummy-5")
+
+        self.assertEqual(workflow.get_job_predecessors("dummy-5"),
+            ["dummy-1", "dummy-2"])
+        self.assertEqual(workflow.get_job_successors("dummy-5"),
+            ["dummy-3", "dummy-4"])
+
     def test_simple_job_ordering (self):
         workflow = spate.new_workflow()
 

@@ -377,6 +377,56 @@ class _workflow:
                     tuple([(output_path, paths_status[output_path]) \
                         for output_path in output_paths]))
 
+    def get_job_predecessors (self, job_id):
+        """ Return job(s) upstream of a given job, if any
+
+            Arguments:
+                job_id (str): job identifier
+
+            Returns:
+                list of str: list of job identifiers
+        """
+        job_node_key = self._ensure_existing_job(job_id)
+
+        input_node_keys = []
+        for (_, input_path) in self._graph.predecessors(job_node_key):
+            input_node_key = (_NODE_TYPE.PATH, input_path)
+            edge = self._graph[input_node_key][job_node_key]
+            input_node_keys.append((edge["_order"], input_node_key))
+
+        input_jobs = []
+        for (_, input_node_key) in sorted(input_node_keys):
+            for (_, job_id) in self._graph.predecessors(input_node_key):
+                if (not job_id in input_jobs):
+                    input_jobs.append(job_id)
+
+        return input_jobs
+
+    def get_job_successors (self, job_id):
+        """ Return job(s) downstream of a given job, if any
+
+            Arguments:
+                job_id (str): job identifier
+
+            Returns:
+                list of str: list of job identifiers
+        """
+        job_node_key = self._ensure_existing_job(job_id)
+
+        output_node_keys = []
+        for (_, output_path) in self._graph.successors(job_node_key):
+            output_node_key = (_NODE_TYPE.PATH, output_path)
+            edge = self._graph[job_node_key][output_node_key]
+            output_node_keys.append((edge["_order"], output_node_key))
+
+        output_jobs = []
+        for (_, output_node_key) in sorted(output_node_keys):
+            for (_, job_id) in self._graph.successors(output_node_key):
+                if (not job_id in output_jobs):
+                    output_jobs.append(job_id)
+
+        return output_jobs
+
     def get_job_paths (self, job_id):
         """ Return input and output paths associated with a job, if any
 
