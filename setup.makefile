@@ -10,7 +10,7 @@ all: uninstall install clean test
 
 uninstall:
 	@echo -e "$(BOLD)uninstalling '$(PROJECT_NAME)'$(RESET)"
-	@pip uninstall -y $(PROJECT_NAME)
+	-@pip uninstall -y $(PROJECT_NAME)
 
 install:
 	@echo -e "$(BOLD)installing '$(PROJECT_NAME)'$(RESET)"

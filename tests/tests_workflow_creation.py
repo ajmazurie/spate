@@ -124,6 +124,47 @@ class WorkflowCreationTests (unittest.TestCase):
 
             workflow.remove_job("dummy-id")
 
+    def test_jobs_batch_addition (self):
+        workflow = spate.new_workflow()
+
+        # we add a first normal job
+        workflow.add_job('a', 'b', job_id = "normal-job-1")
+
+        # we add a set of normal jobs
+        normal_jobs_batch = (
+            ('b', 'c', "dummy-template", "normal-job-2", None),
+            ('c', 'd', "dummy-template", "normal-job-3", None),
+            ('d', 'e', "dummy-template", "normal-job-4", None),
+            )
+
+        # we expect the addition of this set of jobs to succeed
+        added_jobs = workflow.add_jobs(normal_jobs_batch)
+
+        self.assertEqual(workflow.number_of_jobs, 4)
+        self.assertEqual(workflow.number_of_paths, 5)
+        self.assertEqual(added_jobs,
+            ["normal-job-%d" % i for i in range(2, 5)])
+        self.assertEqual(sorted(workflow.list_jobs()),
+            ["normal-job-%d" % i for i in range(1, 5)])
+
+        # we then create a batch of other jobs, the two last ones being faulty
+        faulty_jobs_batch = (
+            ('e', 'f', "dummy-template", "normal-job-5", None),
+            ('f', 'a', "dummy-template", "faulty-job-1", None),
+            ('f', 'b', "dummy-template", "faulty-job-2", None),
+            )
+
+        # we expect the addition of this set of jobs to fail
+        with self.assertRaises(spate.SpateException):
+            workflow.add_jobs(faulty_jobs_batch)
+
+        # we expect that none of these jobs are left
+        self.assertEqual(workflow.number_of_jobs, 4)
+        self.assertEqual(workflow.number_of_paths, 5)
+
+        self.assertEqual(sorted(workflow.list_jobs()),
+            ["normal-job-%d" % i for i in range(1, 5)])
+
     #def test_workflow_equality (self):
 
 

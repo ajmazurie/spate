@@ -108,77 +108,151 @@ class _workflow:
             [5] A job cannot add a cycle in the overall directed acyclic graph
                 of jobs and their associated paths; if this situation occurs a
                 SpateException will be thrown, and the job ignored
+            [6] When multiple jobs must be added, it is suggested to use the
+                `add_jobs()` function instead for speed purpose
         """
-        input_paths = utils.ensure_iterable(inputs)
-        output_paths = utils.ensure_iterable(outputs)
+        return self.add_jobs(((
+            inputs, outputs, template, job_id, job_data),))[0]
 
-        # a default job identifier is created if none is provided
-        if (job_id is None):
-            job_id = "JOB_%d" % (len(filter(
-                lambda (node_type, node): (node_type == _NODE_TYPE.JOB),
-                self._graph.nodes_iter())) + 1)
+    def add_jobs (self, job_definitions):
+        """ Add several jobs to this workflow
 
-        elif (not utils.is_string(job_id)):
-            raise ValueError("invalid value for job_id: %s (type: %s)" % (
-                job_id, type(job_id)))
+            Arguments:
+                job_definitions (list of list): list of job definitions, as
+                    sub-lists of arguments for the `add_job()` function
 
-        # constraint: a given job can only be declared once
-        job_node_key = (_NODE_TYPE.JOB, job_id)
-        if (job_node_key in self._graph):
-            raise errors.SpateException(
-                "a job with identifier '%s' already exists" % job_id)
+            Returns:
+                list of str: job identifiers
 
-        # constraint: inputs and outputs must not have duplicates
-        utils.ensure_unique(input_paths)
-        utils.ensure_unique(output_paths)
+            Notes:
+            [1] `job_definitions` can be a list, iterator, or generator
+            [2] The same commands as the ones found in `add_job()` applies for
+                each job listed in `job_definitions`
+            [3] This function is faster than multiple calls to `add_job()` when
+                adding several jobs, since verification of the overall topology
+                of the workflow is done only once per jobs set
+            [4] This function uses a transaction-like approach: if one of the
+                job cannot be added successfully, the whole set is ignored
+        """
+        if (not utils.is_iterable(job_definitions)):
+            raise ValueError(
+                "invalid type for 'job_definitions' (must be an iterable)")
 
-        # constraint: a job must have at least one input or output
-        if (len(input_paths) == 0) and (len(output_paths) == 0):
-            raise errors.SpateException(
-                "job '%s' has no input nor output" % job_id)
+        job_ids, delayed_exception = [], None
+        for job_definition in job_definitions:
+            try:
+                inputs, outputs, template, job_id, job_data = job_definition
+            except:
+                delayed_exception = ValueError(
+                    "invalid job definition in position %d" % len(job_ids))
+                break
 
-        # constraint: any given path is the product of at most one job
-        for output_path in output_paths:
-            path_node_key = (_NODE_TYPE.PATH, output_path)
-            if (path_node_key in self._graph) and \
-               (self._graph.in_degree(path_node_key) > 0):
-                _, producing_job_id = self._graph.predecessors(path_node_key)[0]
-                raise errors.SpateException(
-                    "path '%s' is already created by job '%s'" % (
-                    output_path, producing_job_id))
+            input_paths = utils.ensure_iterable(inputs)
+            output_paths = utils.ensure_iterable(outputs)
 
-        try:
-            self._graph.add_node(job_node_key)
+            # a default job identifier is created if none is provided
+            if (job_id is None):
+                job_id = "JOB_%d" % (len(filter(
+                    lambda (node_type, node): (node_type == _NODE_TYPE.JOB),
+                    self._graph.nodes_iter())) + 1)
 
-            self.set_job_template(job_id, template)
-            self.set_job_data(job_id, **job_data)
+            # constraint: job identifiers must be strings
+            elif (not utils.is_string(job_id)):
+                delayed_exception = ValueError(
+                    "invalid value for job_id: %s (type: %s)" % (
+                    job_id, type(job_id)))
+                break
 
-        except Exception as e:
-            self._graph.remove_node(job_node_key)
-            raise e
+            # constraint: job identifiers must be unique
+            job_node_key = (_NODE_TYPE.JOB, job_id)
+            if (job_node_key in self._graph):
+                delayed_exception = errors.SpateException(
+                    "a job with identifier '%s' already exists" % job_id)
+                break
 
-        for (n, input_path) in enumerate(input_paths):
-            self._graph.add_edge(
-                (_NODE_TYPE.PATH, input_path),
+            # constraint: inputs and outputs must not have duplicates
+            try:
+                utils.ensure_unique(input_paths)
+                utils.ensure_unique(output_paths)
+
+            except Exception as e:
+                delayed_exception = e
+                break
+
+            # constraint: a job must have at least one input or output
+            if (len(input_paths) == 0) and (len(output_paths) == 0):
+                delayed_exception = errors.SpateException(
+                    "job '%s' has no input nor output" % job_id)
+                break
+
+            self._graph.add_node(
                 job_node_key,
-                _order = n + 1)
+                _template = None,
+                _data = None)
 
-        for (n, output_path) in enumerate(output_paths):
-            self._graph.add_edge(
-                job_node_key,
-                (_NODE_TYPE.PATH, output_path),
-                _order = n + 1)
+            for (n, input_path) in enumerate(input_paths):
+                self._graph.add_edge(
+                    (_NODE_TYPE.PATH, input_path),
+                    job_node_key,
+                    _order = n + 1)
 
-        # constraint: the workflow must be a directed acyclic graph
-        if (not networkx.is_directed_acyclic_graph(self._graph)):
-            self.remove_job(job_id)
-            raise errors.SpateException(
-                "unable to add job '%s' without creating cycles" % job_id)
+            for (n, output_path) in enumerate(output_paths):
+                self._graph.add_edge(
+                    job_node_key,
+                    (_NODE_TYPE.PATH, output_path),
+                    _order = n + 1)
 
-        logger.debug("job '%s' added (inputs: %s; outputs: %s)" % (
-            job_id, ' '.join(input_paths), ' '.join(output_paths)))
+            job_ids.append(job_id)
 
-        return job_id
+            if (job_data is None):
+                job_data = {}
+
+            try:
+                self.set_job_template(job_id, template)
+                self.set_job_data(job_id, **job_data)
+
+            except Exception as e:
+                delayed_exception = e
+                break
+
+            logger.debug("job '%s' added (inputs: %s; outputs: %s)" % (
+                job_id, ' '.join(input_paths), ' '.join(output_paths)))
+
+        if (delayed_exception is None):
+            # constraint: any given path is the product of at most one job
+            for (node_type, path) in self._graph.nodes():
+                if (node_type != _NODE_TYPE.PATH):
+                    continue
+
+                path_node_key = (node_type, path)
+                if (self._graph.in_degree(path_node_key) < 2):
+                    continue
+
+                producing_job_ids = ["'%s'" % job_id for (_, job_id) in \
+                    self._graph.predecessors(path_node_key)]
+
+                delayed_exception = errors.SpateException(
+                    "path '%s' is created by more than one job: %s" % (
+                    path, ', '.join(producing_job_ids)))
+                break
+
+        if (delayed_exception is None):
+            # constraint: the workflow must be a directed acyclic graph
+            if (not networkx.is_directed_acyclic_graph(self._graph)):
+                delayed_exception = errors.SpateException(
+                    "unable to add job%s %s without creating cycles" % (
+                        's' if (len(job_ids) > 1) else '',
+                        ', '.join(["'%s'" % job_id for job_id in job_ids])))
+
+        # if any exception was thrown by one of the job addition,
+        # we remove all jobs that were added in this transaction
+        if (delayed_exception is not None):
+            for job_id in job_ids:
+                self.remove_job(job_id)
+
+            raise delayed_exception
+
+        return job_ids
 
     def remove_job (self, job_id):
         """ Remove an existing job from this workflow
