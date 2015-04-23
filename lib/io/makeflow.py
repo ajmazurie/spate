@@ -18,8 +18,8 @@ def to_makeflow (workflow, target, outdated_only = True,
         Arguments:
             workflow (obj): a workflow object
             target (str or obj): a target filename or file-like object
-            outdated_only (boolean, optional): if set to True (default), will
-                export outdated jobs only, rather than all jobs in the workflow
+            outdated_only (boolean, optional): if set to True, will only export
+                jobs that need to be re-run; if False, all jobs are exported
             **makeflow_kwargs (dict, optional): variables for the Makeflow
                 script; these variables will be declared before all jobs
 

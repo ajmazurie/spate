@@ -126,6 +126,9 @@ def draw (workflow, filename, outdated_only = True, decorated = True,
     else:
         g = to_graphviz(workflow, outdated_only = outdated_only)
 
+    if (g.number_of_nodes() == 0):
+        return
+
     g.graph_attr["rankdir"] = "LR"
     #g.graph_attr["nodesep"] = 2.0
     g.graph_attr["overlap"] = "scale"

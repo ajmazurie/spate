@@ -88,15 +88,18 @@ def from_json (data):
             }
     """
     try:
-        w = core._workflow(data["workflow"]["name"])
-        for job in data["jobs"]:
-            w.add_job(
-                job.get("inputs"),
-                job.get("outputs"),
-                job.get("template"),
-                job["id"],
-                **job.get("data", {}))
+        w = core.new_workflow(data["workflow"]["name"])
 
+        def jobs():
+            for job in data["jobs"]:
+                yield (
+                    job.get("inputs"),
+                    job.get("outputs"),
+                    job.get("template"),
+                    job["id"],
+                    job.get("data", {}))
+
+        w.add_jobs(jobs())
         return w
 
     except KeyError as e:

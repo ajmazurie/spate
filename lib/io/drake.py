@@ -18,8 +18,8 @@ def to_drake (workflow, target, outdated_only = True):
             workflow (object): a workflow object
             target (str or object): either a filename, or a file object open
                 in writing mode
-            outdated_only (boolean, optional): if set to True (default), will
-                only export outdated jobs rather than all existing jobs
+            outdated_only (boolean, optional): if set to True, will only export
+                jobs that need to be re-run; if False, all jobs are exported
 
         Returns:
             int: number of jobs exported

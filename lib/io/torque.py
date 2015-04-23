@@ -16,6 +16,15 @@ def to_torque_array (workflow, output_prefix,
     outdated_only = True, **qsub_kwargs):
     """ Export a workflow as a TORQUE/PBS array
 
+        Arguments:
+            workflow (object): a workflow object
+            output_prefix (str): the prefix for all output files
+            outdated_only (boolean, optional): if set to True, will only export
+                jobs that need to be re-run; if False, all jobs are exported
+            **qsub_kwargs (dict, optional): arguments for qsub
+
+        Returns:
+            int: number of jobs exported
     """
     _ensure_workflow(workflow)
 

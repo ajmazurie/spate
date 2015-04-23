@@ -152,8 +152,8 @@ def to_shell_script (workflow, target, outdated_only = True,
         Arguments:
             workflow (object): a workflow object
             target (str or obj): the name of a shell script, or a file object
-            outdated_only (boolean, optional): if set to True (default), will
-                export outdated jobs only, rather than all jobs in the workflow
+            outdated_only (boolean, optional): if set to True, will only export
+                jobs that need to be re-run; if False, all jobs are exported
             shell (str, optional): path to the shell to use; if none provided
                 then /bin/bash is used by default
             shell_args (str or list of str, optional): options for the shell,
