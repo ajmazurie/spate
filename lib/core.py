@@ -138,6 +138,8 @@ class _workflow:
             raise ValueError(
                 "invalid type for 'job_definitions' (must be an iterable)")
 
+        job_id_cursor = self.number_of_jobs + 1
+
         job_ids, delayed_exception = [], None
         for job_definition in job_definitions:
             try:
@@ -152,9 +154,8 @@ class _workflow:
 
             # a default job identifier is created if none is provided
             if (job_id is None):
-                job_id = "JOB_%d" % (len(filter(
-                    lambda (node_type, node): (node_type == _NODE_TYPE.JOB),
-                    self._graph.nodes_iter())) + 1)
+                job_id = "JOB_%d" % job_id_cursor
+                job_id_cursor += 1
 
             # constraint: job identifiers must be strings
             elif (not utils.is_string(job_id)):
@@ -162,6 +163,9 @@ class _workflow:
                     "invalid value for job_id: %s (type: %s)" % (
                     job_id, type(job_id)))
                 break
+
+            if (job_data is None):
+                job_data = {}
 
             # constraint: job identifiers must be unique
             job_node_key = (_NODE_TYPE.JOB, job_id)
@@ -203,9 +207,6 @@ class _workflow:
                     _order = n + 1)
 
             job_ids.append(job_id)
-
-            if (job_data is None):
-                job_data = {}
 
             try:
                 self.set_job_template(job_id, template)
@@ -251,6 +252,9 @@ class _workflow:
                 self.remove_job(job_id)
 
             raise delayed_exception
+
+        logger.debug("%d job%s added" % (
+            len(job_ids), 's' if (len(job_ids) > 1) else ''))
 
         return job_ids
 
