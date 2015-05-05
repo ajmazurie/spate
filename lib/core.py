@@ -79,6 +79,13 @@ class _workflow:
 
         return job_node_key
 
+    def _ensure_existing_path (self, path):
+        path_node_key = (_NODE_TYPE.PATH, path)
+        if (not path_node_key in self._graph):
+            raise errors.SpateException("unknown path '%s'" % path)
+
+        return path_node_key
+
     def add_job (self, inputs = None, outputs = None, template = None,
         job_id = None, **job_data):
         """ Add a job to this workflow
@@ -298,6 +305,22 @@ class _workflow:
         """
         return (job_id in self)
 
+    def has_path (self, path):
+        """ Test if a path is part of this workflow
+
+            Arguments:
+                path (str): path
+
+            Returns:
+                boolean: True if this path is used in this workflow,
+                    False otherwise
+        """
+        try:
+            self._ensure_existing_path(path)
+            return True
+        except:
+            return False
+
     def __contains__ (self, job_id):
         if (not utils.is_string(job_id)):
             return False
@@ -515,24 +538,51 @@ class _workflow:
                 list of str: list of input paths (or empty list)
                 list of str: list of output paths (or empty list)
 
+            Notes:
             [1] A SpateException will be raised if the job doesn't exist
         """
         job_node_key = self._ensure_existing_job(job_id)
 
         input_paths = []
-        for (_, input_path) in self._graph.predecessors(job_node_key):
-            edge = self._graph[(_NODE_TYPE.PATH, input_path)][job_node_key]
-            input_paths.append((edge["_order"], input_path))
+        for (_, path) in self._graph.predecessors(job_node_key):
+            edge = self._graph[(_NODE_TYPE.PATH, path)][job_node_key]
+            input_paths.append((edge["_order"], path))
 
         output_paths = []
-        for (_, output_path) in self._graph.successors(job_node_key):
-            edge = self._graph[job_node_key][(_NODE_TYPE.PATH, output_path)]
-            output_paths.append((edge["_order"], output_path))
+        for (_, path) in self._graph.successors(job_node_key):
+            edge = self._graph[job_node_key][(_NODE_TYPE.PATH, path)]
+            output_paths.append((edge["_order"], path))
 
         return (
-            tuple([input_path for (_, input_path) in sorted(input_paths)]),
-            tuple([output_path for (_, output_path) in sorted(output_paths)])
-        )
+            tuple([path for (_, path) in sorted(input_paths)]),
+            tuple([path for (_, path) in sorted(output_paths)]))
+
+    def get_path_jobs (self, path):
+        """ Return upstream and downstream jobs associated with a path, if any
+
+            Arguments:
+                path (str): a path
+
+            Returns:
+                list of str: list of upstream jobs (or empty list)
+                list of str: list of downstream jobs (or empty list)
+
+            Notes:
+            [1] A SpateException will be raised if the path doesn't exist
+        """
+        path_node_key = self._ensure_existing_path(path)
+
+        upstream_jobs = []
+        for (_, job_id) in self._graph.predecessors(path_node_key):
+            upstream_jobs.append(job_id)
+
+        downstream_jobs = []
+        for (_, job_id) in self._graph.successors(path_node_key):
+            downstream_jobs.append(job_id)
+
+        return (
+            tuple(sorted(upstream_jobs)),
+            tuple(sorted(downstream_jobs)))
 
     def get_job_template (self, job_id):
         """ Return the template associated with a job, if any
