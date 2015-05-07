@@ -20,15 +20,18 @@ class WorkflowCreationTests (unittest.TestCase):
         workflow = spate.new_workflow(name = workflow_name_1)
         self.assertEqual(workflow.name, workflow_name_1)
 
+    def test_workflow_properties_manipulation (self):
+        workflow = spate.new_workflow()
+
         # a workflow name can be set and retrieved through the 'name' property
-        workflow_name_2 = spate.utils.random_string()
-        workflow.name = workflow_name_2
-        self.assertEqual(workflow.name, workflow_name_2)
+        workflow_name_1 = spate.utils.random_string()
+        workflow.name = workflow_name_1
+        self.assertEqual(workflow.name, workflow_name_1)
 
         # a workflow name can be set and retrieved through dedicated methods
-        workflow_name_3 = spate.utils.random_string()
-        workflow.set_name(workflow_name_3)
-        self.assertEqual(workflow.get_name(), workflow_name_3)
+        workflow_name_2 = spate.utils.random_string()
+        workflow.set_name(workflow_name_2)
+        self.assertEqual(workflow.get_name(), workflow_name_2)
 
     def test_job_creation_with_default_parameters (self):
         workflow = spate.new_workflow()
@@ -89,6 +92,15 @@ class WorkflowCreationTests (unittest.TestCase):
         self.assertEqual(data.get("variable_a"), 1)
         self.assertEqual(data.get("variable_b"), 2)
 
+    def test_job_properties_manipulation (self):
+        workflow = spate.new_workflow()
+
+        job_id = workflow.add_job(
+            inputs = "a", outputs = "b",
+            template = "dummy-template",
+            job_id = "dummy-id",
+            variable_a = 1, variable_b = 2)
+
         # the job template can be modified at will
         new_template = "new-template"
         workflow.set_job_template(job_id, new_template)
@@ -103,7 +115,7 @@ class WorkflowCreationTests (unittest.TestCase):
         workflow.get_job_data(job_id)["variable_c"] += 1
         self.assertEqual(new_data, workflow.get_job_data(job_id))
 
-    def test_jobs_addition_and_deletion (self):
+    def test_job_addition_and_deletion (self):
         workflow = spate.new_workflow()
 
         # a newly created workflow should have no job nor path
@@ -166,7 +178,7 @@ class WorkflowCreationTests (unittest.TestCase):
             self.assertEqual(workflow.number_of_jobs, 0)
             self.assertEqual(workflow.number_of_paths, 0)
 
-    def test_jobs_batch_addition (self):
+    def test_job_batch_addition (self):
         workflow = spate.new_workflow()
 
         # we add a first normal job

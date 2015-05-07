@@ -1,9 +1,9 @@
 # Template engines to render jobs code
 
+import string
+
 import core
 import utils
-
-import string
 
 __all__ = (
     "set_template_engine",

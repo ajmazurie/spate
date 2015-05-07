@@ -1,11 +1,11 @@
 
-from .. import utils
-from .. import templates
-from base import _ensure_workflow, _stream_writer
-
-import os
-import logging
 import collections
+import logging
+import os
+
+from .. import errors
+from .. import templates
+import utils
 
 __all__ = (
     "to_makefile",)
@@ -34,13 +34,13 @@ def to_makefile (workflow, target, outdated_only = True,
         [3] GNU Make cannot handle file names with space in them; a
             SpateException will be thrown if such a case occurs
     """
-    _ensure_workflow(workflow)
+    utils.ensure_workflow(workflow)
 
     jobs = workflow.list_jobs(
         outdated_only = outdated_only,
         with_paths = True)
 
-    target_fh = _stream_writer(target)
+    target_fh, is_named_target = utils.stream_writer(target)
     logger.debug("exporting %s to %s" % (workflow, target_fh))
 
     if (shell is not None):
@@ -51,8 +51,7 @@ def to_makefile (workflow, target, outdated_only = True,
 
     target_paths, all_paths = collections.OrderedDict(), {}
 
-    n_jobs = 0
-    bodies = []
+    n_jobs, job_contents = 0, []
     for (job_id, input_paths, output_paths) in jobs:
         # ensure that we have at least one output path
         if (len(output_paths) == 0):
@@ -72,20 +71,24 @@ def to_makefile (workflow, target, outdated_only = True,
             if (len(downstream_jobs) == 0):
                 target_paths[path] = True
 
-        body = utils.dedent_text_block(
+        # Make accepts multi-line job content, but no empty lines
+        job_content = utils.dedent_text_block(
             templates.render_job(workflow, job_id),
             ignore_empty_lines = True)
 
-        bodies.append("\n# %s\n%s: %s\n\t%s\n" % (
+        job_contents.append("\n# %s\n%s: %s\n\t%s\n" % (
             job_id,
             ' '.join(output_paths),
             ' '.join(input_paths),
-            '\n\t'.join(['@' + line for line in body])))
+            '\n\t'.join(['@' + line for line in job_content])))
 
         n_jobs += 1
 
-    if (n_jobs == 0) and (utils.is_string(target)):
+    logger.debug("%d jobs exported" % n_jobs)
+
+    if (n_jobs == 0) and (is_named_target):
         logger.debug("removing named output file '%s'" % target)
+
         target_fh.close()
         os.remove(target)
         return 0
@@ -105,7 +108,7 @@ def to_makefile (workflow, target, outdated_only = True,
     target_fh.write("\n%s: %s\n" % (
         main_target_name, ' '.join(target_paths)))
 
-    for body in bodies:
-        target_fh.write(body)
+    for job_content in job_contents:
+        target_fh.write(job_content)
 
     return n_jobs

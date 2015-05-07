@@ -1,10 +1,10 @@
 
-from .. import utils
-from .. import templates
-from base import _ensure_workflow, _stream_writer
-
-import os
 import logging
+import os
+
+from .. import errors
+from .. import templates
+import utils
 
 __all__ = (
     "to_makeflow",)
@@ -31,17 +31,17 @@ def to_makeflow (workflow, target, outdated_only = True,
         [2] Makeflow requires jobs to have at least one input and one output
             file; a SpateException will be thrown if that is not the case
     """
-    _ensure_workflow(workflow)
+    utils.ensure_workflow(workflow)
 
     jobs = workflow.list_jobs(
         outdated_only = outdated_only,
         with_paths = True)
 
-    o_fh = _stream_writer(target)
-    logger.debug("exporting %s to %s" % (workflow, o_fh))
+    target_fh, is_named_target = utils.stream_writer(target)
+    logger.debug("exporting %s to %s" % (workflow, target_fh))
 
     for (k, v) in makeflow_kwargs.iteritems():
-        o_fh.write("%s=%s\n" % (k, v))
+        target_fh.write("%s=%s\n" % (k, v))
 
     n_jobs = 0
     for (job_id, input_paths, output_paths) in jobs:
@@ -57,19 +57,20 @@ def to_makeflow (workflow, target, outdated_only = True,
         body = utils.flatten_text_block(
             templates.render_job(workflow, job_id))
 
-        o_fh.write("\n# %s\n%s: %s\n\t%s\n\n" % (
+        target_fh.write("\n# %s\n%s: %s\n\t%s\n\n" % (
             job_id,
             ' '.join(output_paths),
             ' '.join(input_paths),
             body))
+
         n_jobs += 1
 
     logger.debug("%d jobs exported" % n_jobs)
 
-    if (n_jobs == 0) and (utils.is_string(target)):
+    if (n_jobs == 0) and (is_named_target):
         logger.debug("removing named output file '%s'" % target)
 
-        o_fh.close()
+        target_fh.close()
         os.remove(target)
 
     return n_jobs

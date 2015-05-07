@@ -1,15 +1,14 @@
 
-from .. import core
-from .. import utils
-from .. import errors
-
 import collections
 import json
-import yaml
-import gzip
-import bz2
-import enum
 import logging
+
+from .. import core
+from .. import errors
+import utils
+
+import enum
+import yaml
 
 __all__ = (
     "from_json",
@@ -20,47 +19,6 @@ __all__ = (
     "save")
 
 logger = logging.getLogger(__name__)
-
-def _stream_reader (source):
-    if (source is None):
-        return sys.stdin
-
-    elif (utils.is_string(source)):
-        if (source.lower().endswith(".gz")):
-            return gzip.open(source, "rb")
-        elif (source.lower().endswith(".bz2")):
-            return bz2.BZ2File(source, "r")
-        else:
-            return open(source, "rU")
-
-    elif (hasattr(source, "read")):
-        return source
-
-    raise ValueError("invalid source object %s (type: %s)" % (
-        source, type(source)))
-
-def _stream_writer (target):
-    if (target is None):
-        return sys.stdout
-
-    elif (utils.is_string(target)):
-        if (target.lower().endswith(".gz")):
-            return gzip.open(target, "wb")
-        elif (target.lower().endswith(".bz2")):
-            return bz2.BZ2File(target, "w")
-        else:
-            return open(target, "w")
-
-    elif (hasattr(target, "write")):
-        return target
-
-    raise ValueError("invalid target object %s (type: %s)" % (
-        target, type(target)))
-
-def _ensure_workflow (obj):
-    if (not isinstance(obj, core._workflow)):
-        raise ValueError("invalid value for workflow: %s (type: %s)" % (
-            obj, type(obj)))
 
 def from_json (data):
     """ Create a new workflow object from a JSON object
@@ -120,7 +78,7 @@ def to_json (workflow, outdated_only = True):
         [1] The JSON document is formatted as shown in the documentation of the
             `from_json` method
     """
-    _ensure_workflow(workflow)
+    utils.ensure_workflow(workflow)
 
     data = {
         "workflow": {
@@ -227,8 +185,8 @@ def load (source):
         [3] The YAML-formatted file must comply to the schema shown in the
             documentation of the `from_yaml` method
     """
-    i_fh = _stream_reader(source)
-    raw_data, data = i_fh.read(), None
+    source_fh, is_named_source = utils.stream_reader(source)
+    raw_data, data = source_fh.read(), None
 
     try:
         data = json.loads(raw_data)
@@ -273,20 +231,20 @@ def save (workflow, target, outdated_only = True):
     """
     data = to_json(workflow, outdated_only)
 
-    o_fh = _stream_writer(target)
-    o_format = _FILE_FORMAT.JSON
+    target_fh, is_named_target = utils.stream_writer(target)
+    target_format = _FILE_FORMAT.JSON
 
-    if (utils.is_string(target)):
+    if (is_named_target):
         if (target.lower().endswith(".yaml") or \
             target.lower().endswith(".yaml.gz")):
-            o_format = _FILE_FORMAT.YAML
+            target_format = _FILE_FORMAT.YAML
 
-    if (o_format == _FILE_FORMAT.JSON):
-        json.dump(data, o_fh,
+    if (target_format == _FILE_FORMAT.JSON):
+        json.dump(data, target_fh,
             indent = 4,
             separators = (',', ': '))
 
-    elif (o_format == _FILE_FORMAT.YAML):
-        yaml.dump(data, stream = o_fh,
+    elif (target_format == _FILE_FORMAT.YAML):
+        yaml.dump(data, stream = target_fh,
             explicit_start = True,
             default_flow_style = False)

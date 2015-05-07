@@ -1,10 +1,10 @@
 
-from .. import core
-from .. import utils
-from .. import errors
-
-import re
 import os
+import re
+
+from .. import core
+from .. import errors
+import utils
 
 __all__ = (
     "draw",
@@ -27,9 +27,7 @@ def to_graphviz (workflow, filename = None, outdated_only = True):
             - the Pygraphviz Python library; see http://pygraphviz.github.io/
             - the Graphviz software package; see http://www.graphviz.org/
     """
-    if (not isinstance(workflow, core._workflow)):
-        raise ValueError("invalid value type for workflow")
-
+    utils.ensure_workflow(workflow)
     pygraphviz = utils.ensure_module("pygraphviz")
 
     g = pygraphviz.AGraph(name = workflow.name,
@@ -132,15 +130,14 @@ def draw (workflow, filename, outdated_only = True, decorated = True,
     g.graph_attr["rankdir"] = "LR"
     #g.graph_attr["nodesep"] = 2.0
     g.graph_attr["overlap"] = "scale"
-    g.node_attr["shape"] = "box"
     g.node_attr["style"] = "rounded,filled"
     g.node_attr["fontname"] = "Monospace"
 
     for node in g.nodes_iter():
         try:
             if (node.attr["_type"] == core._NODE_TYPE.JOB.name):
-                node.attr["shape"] = "circle"
-                node.attr["fontsize"] = 20
+                node.attr["shape"] = "box"
+                node.attr["fontsize"] = 18
                 node.attr["fontname"] = "Helvetica"
 
                 if (decorated):
@@ -149,13 +146,15 @@ def draw (workflow, filename, outdated_only = True, decorated = True,
                         "#%02X%02X%02X" % _GRAPHVIZ_JOB_NODE_FGCOLOR[job_status]
 
             elif (node.attr["_type"] == core._NODE_TYPE.PATH.name):
+                node.attr["shape"] = "folder"
+
                 if (decorated):
                     path_status = core.PATH_STATUS[node.attr["_status"]]
                     node.attr["fillcolor"] = \
                         "#%02X%02X%02X" % _GRAPHVIZ_PATH_NODE_FGCOLOR[path_status]
 
         except KeyError as e:
-            raise Exception(
+            raise errors.SpateException(
                 "invalid pygraphviz object: missing key '%s' for node %s" % (
                     e.args[0], node))
 

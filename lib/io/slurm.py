@@ -1,11 +1,10 @@
-# Export a workflow as a SLURM job array
 
-from .. import utils
-from .. import templates
-from base import _ensure_workflow
-
-import os
 import logging
+import os
+
+from .. import errors
+from .. import templates
+import utils
 
 __all__ = (
     "to_slurm_array",)
@@ -67,8 +66,8 @@ def _slurm_flag_mapper (flag):
     else:
         return flag
 
-def to_slurm_array (workflow, output_prefix,
-    outdated_only = True, max_jobs_per_array = None, **sbatch_kwargs):
+def to_slurm_array (workflow, output_prefix, outdated_only = True,
+    max_jobs_per_array = None, **sbatch_kwargs):
     """ Export a workflow as a SLURM array
 
         Arguments:
@@ -89,7 +88,7 @@ def to_slurm_array (workflow, output_prefix,
             which contains the job commands, and <output_prefix>.slurm_array,
             which contains the shell script that need to be sent to sbatch
     """
-    _ensure_workflow(workflow)
+    utils.ensure_workflow(workflow)
 
     job_ids = list(workflow.list_jobs(
         outdated_only = outdated_only,

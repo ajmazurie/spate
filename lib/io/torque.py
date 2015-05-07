@@ -1,16 +1,29 @@
 # Export a workflow as a TORQUE/PBS array
 
-from .. import utils
-from .. import templates
-from base import _ensure_workflow
-
-import os
 import logging
+import os
+
+from .. import errors
+from .. import templates
+import utils
 
 __all__ = (
     "to_torque_array",)
 
 logger = logging.getLogger(__name__)
+
+_SBATCH_SCRIPT_TEMPLATE = """\
+#!/bin/bash
+%(qsub_args)s
+%(cwd)s
+_ALL_JOBS="%(torque_jobs_fn)s"
+_CURRENT_JOB="$(awk "NR==${PBS_ARRAYID}" ${_ALL_JOBS})"
+
+echo ${_CURRENT_JOB}
+echo
+
+eval ${_CURRENT_JOB}
+"""
 
 def to_torque_array (workflow, output_prefix,
     outdated_only = True, **qsub_kwargs):
@@ -26,7 +39,7 @@ def to_torque_array (workflow, output_prefix,
         Returns:
             int: number of jobs exported
     """
-    _ensure_workflow(workflow)
+    utils.ensure_workflow(workflow)
 
     torque_jobs_fn = output_prefix + ".torque_jobs"
     torque_jobs_fh = open(torque_jobs_fn, "w")
@@ -81,18 +94,7 @@ def to_torque_array (workflow, output_prefix,
     torque_array_fn = output_prefix + ".torque_array"
     torque_array_fh = open(torque_array_fn, "w")
 
-    torque_array_fh.write("""\
-#!/bin/bash
-%(qsub_args)s
-%(cwd)s
-_ALL_JOBS="%(torque_jobs_fn)s"
-_CURRENT_JOB="$(awk "NR==${PBS_ARRAYID}" ${_ALL_JOBS})"
-
-echo ${_CURRENT_JOB}
-echo
-
-eval ${_CURRENT_JOB}
-""" % locals())
-
+    torque_array_fh.write(_QSUB_SCRIPT_TEMPLATE % locals())
     torque_array_fh.close()
+
     return n_jobs
