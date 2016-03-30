@@ -7,24 +7,11 @@ from .. import templates
 import utils
 
 __all__ = (
-    "to_slurm_array",)
+    "to_slurm",)
 
 logger = logging.getLogger(__name__)
 
-_SBATCH_SCRIPT_TEMPLATE = """\
-#!/bin/bash
-%(sbatch_args)s
-
-_ALL_JOBS="%(slurm_jobs_fn)s"
-_CURRENT_JOB="$(awk "NR==${SLURM_ARRAY_TASK_ID}" ${_ALL_JOBS})"
-
-echo ${_CURRENT_JOB}
-echo
-
-eval ${_CURRENT_JOB}
-"""
-
-_SBATCH_LONG_OPTIONS = {
+_SBATCH_OPTIONS_WITH_DASH = {
     "a": "array",
     "A": "account",
     "B": "extra-node-info",
@@ -59,91 +46,85 @@ _SBATCH_OPTIONS_WITH_UNDERLINE = (
     "mem_bind")
 
 def _slurm_flag_mapper (flag):
-    if (not flag in _SBATCH_OPTIONS_WITH_UNDERLINE):
-        return _SBATCH_LONG_OPTIONS.get(flag, flag).replace('_', '-')
-    else:
+    if (flag in _SBATCH_OPTIONS_WITH_UNDERLINE):
         return flag
+    else:
+        return _SBATCH_OPTIONS_WITH_DASH.get(flag, flag).replace('_', '-')
 
-def to_slurm_array (workflow, output_prefix, outdated_only = True,
-    max_jobs_per_array = None, **sbatch_kwargs):
-    """ Export a workflow as a SLURM array
+def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
+    """ Export a workflow as a SLURM sbatch script
 
         Arguments:
             workflow (object): a workflow object
-            output_prefix (str): the prefix for all output files
+            target (str or object): either a filename, or a file object open
+                in writing mode
             outdated_only (boolean, optional): if set to True, will only export
                 jobs that need to be re-run; if False, all jobs are exported
-            max_jobs_per_array (int, optional): if set, will limit the number
-                of jobs per array to this value, creating additional arrays if
-                needed. Additional arrays will receive a numbered suffix
             **sbatch_kwargs (dict, optional): arguments for sbatch
 
         Returns:
             int: number of jobs exported
 
         Notes:
-        [1] Job arrays are exported as two files: <output_prefix>.slurm_jobs,
-            which contains the job commands, and <output_prefix>.slurm_array,
-            which contains the shell script that need to be sent to sbatch
+        [1] If no job is found in the workflow, no file will be created
     """
     utils.ensure_workflow(workflow)
 
-    job_ids = list(workflow.list_jobs(
-        outdated_only = outdated_only,
-        with_descendants = False))
+    job_ids = workflow.list_jobs(
+        outdated_only = outdated_only)
 
-    n_jobs = len(job_ids)
-    if (n_jobs == 0):
-        return 0
+    target_fh, is_named_target = utils.stream_writer(target)
+    logger.debug("exporting %s to %s" % (workflow, target_fh))
 
-    def _export_jobs (job_ids, suffix):
-        # job definitions
-        slurm_jobs_fn = output_prefix + suffix + ".slurm_jobs"
-        slurm_jobs_fh = open(slurm_jobs_fn, "w")
+    # write master sbatch script options
+    sbatch_kwargs = utils.parse_flags(
+        sbatch_kwargs,
+        {"job-name": workflow.name},
+        {},
+        _slurm_flag_mapper)
 
-        for job_id in job_ids:
-            body = utils.flatten_text_block(
-                templates.render_job(workflow, job_id))
-            slurm_jobs_fh.write(body + '\n')
+    sbatch_args = []
+    for k in sorted(sbatch_kwargs):
+        v = sbatch_kwargs[k]
+        if (v is None):
+            sbatch_args.append("#SBATCH --%s" % k)
+        else:
+            sbatch_args.append("#SBATCH --%s %s" % (k, v))
 
-        slurm_jobs_fh.close()
+    target_fh.write("#!/bin/bash\n%s\n" % '\n'.join(sbatch_args))
 
-        # sbatch script
-        slurm_array_fn = output_prefix + suffix + ".slurm_array"
-        slurm_array_fh = open(slurm_array_fn, "w")
+    # write per-job sbatch subscripts
+    job_idx, job_id_to_idx = 1, {}
+    for job_id in job_ids:
+        body = '\n'.join(utils.dedent_text_block(
+            templates.render_job(workflow, job_id)))
 
-        sbatch_kwargs_ = utils.parse_flags(
-            sbatch_kwargs, {
-                "job-name": workflow.name,
-                "output": slurm_jobs_fn + "_%A_%a.out",
-                "error": slurm_jobs_fn + "_%A_%a.err",
-            }, {
-                "array": "1-%d" % len(job_ids)
-            },
-            _slurm_flag_mapper)
+        parent_job_ids = workflow.get_job_predecessors(job_id)
+        if (len(parent_job_ids) == 0):
+            dependencies = ''
+        else:
+            job_id_mapper = lambda x: ":${JOB_%d_ID}" % job_id_to_idx[x]
+            dependencies = " --dependency=afterok" + ''.join(
+                map(job_id_mapper, parent_job_ids))
 
-        sbatch_args = []
-        for k in sorted(sbatch_kwargs_):
-            v = sbatch_kwargs_[k]
-            if (v is None):
-                sbatch_args.append("#SBATCH --%s" % k)
-            else:
-                sbatch_args.append("#SBATCH --%s %s" % (k, v))
+        target_fh.write((
+            "\n# %(job_id)s\n"
+            "JOB_%(job_idx)d_ID=$("
+            "sbatch%(dependencies)s "
+            "<<'EOB'\n#!/bin/bash\n%(body)s\nEOB\n"
+            "); JOB_%(job_idx)d_ID=${JOB_%(job_idx)d_ID##* }\n"
+            ) % locals())
 
-        sbatch_args = '\n'.join(sbatch_args)
+        job_id_to_idx[job_id] = job_idx
+        job_idx += 1
 
-        slurm_array_fh.write(_SBATCH_SCRIPT_TEMPLATE % locals())
-        slurm_array_fh.close()
+    n_jobs = job_idx - 1
+    logger.debug("%d jobs exported" % n_jobs)
 
-    if (max_jobs_per_array is not None) and (n_jobs > max_jobs_per_array):
-        blocks = list(range(0, n_jobs, max_jobs_per_array))
-        suffix_length = len(str(len(blocks)))
+    if (n_jobs == 0) and (is_named_target):
+        logger.debug("removing named output file '%s'" % target)
 
-        for block_i, block_start in enumerate(blocks):
-            _export_jobs(
-                job_ids[block_start:block_start+max_jobs_per_array],
-                '_' + str(block_i + 1).zfill(suffix_length))
-    else:
-        _export_jobs(job_ids, '')
+        target_fh.close()
+        os.remove(target)
 
     return n_jobs

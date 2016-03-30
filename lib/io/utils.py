@@ -75,7 +75,7 @@ def flatten_text_block (text):
 
     return '; '.join(text_)
 
-def parse_flags (kwargs, pre_kwargs = None, post_kwargs = None, mapper = None):
+def parse_flags (kwargs, pre_kwargs, post_kwargs, mapper):
     kwargs_ = {}
     for (k, v) in pre_kwargs.iteritems():
         kwargs_[k] = v
