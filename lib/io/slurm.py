@@ -52,13 +52,11 @@ _SBATCH_LONG_OPTIONS = {
     "S": "core-spec",
     "t": "time",
     "w": "nodelist",
-    "x": "exclude",
-    }
+    "x": "exclude"}
 
 _SBATCH_OPTIONS_WITH_UNDERLINE = (
     "cpu_bind",
-    "mem_bind"
-    )
+    "mem_bind")
 
 def _slurm_flag_mapper (flag):
     if (not flag in _SBATCH_OPTIONS_WITH_UNDERLINE):

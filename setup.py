@@ -1,51 +1,41 @@
 #!/usr/bin/env python
 
-import setuptools
-import os
-import shutil
-import json
 import glob
+import setuptools
 
-HERE = os.path.abspath(os.path.dirname(__file__))
-here = lambda fn: os.path.join(HERE, fn)
+setuptools.setup(
+    name = "spate",
+    version = "0.1.1",
+    description = (
+        "Lightweight workflow composition and generation engine"),
 
-_PACKAGE_NAME = "spate"
-_VERSION = json.load(open(here("VERSION"), "rU"))
-_DEPENDENCIES = open(here("DEPENDENCIES"), "rU").readlines()
-_PACKAGED_FILES = [
-    "DEPENDENCIES",
-    "VERSION",
-    "CHANGELOG",
-]
+    # package author
+    author = "Aurelien Mazurie",
+    author_email = "ajmazurie@oenone.net",
 
-with open(here("MANIFEST.in"), "w") as manifest:
-    for fn in _PACKAGED_FILES:
-        manifest.write("include " + fn + "\n")
+    # package content
+    packages = [
+        "spate",
+        "spate.io"],
+    package_dir = {
+        "spate": "lib"},
+    scripts = glob.glob("bin/*"),
 
-try:
-    setuptools.setup(
-        # Package description
-        name = _PACKAGE_NAME,
-        description = "Lightweight file-based workflow management system",
-        version = "%(changeset_latest_tag)s%(changeset_local_revision)s" % _VERSION,
-        author = "Aurelien Mazurie",
-        author_email = "ajmazurie@oenone.net",
+    # package requirements
+    install_requires = [
+        "colorama",
+        "enum34",
+        "networkx",
+        "pystache",
+        "pyyaml"],
 
-        # Package requirements
-        install_requires = _DEPENDENCIES,
-
-        # Package components
-        packages = [
-            _PACKAGE_NAME,
-            _PACKAGE_NAME + ".io",
-        ],
-        package_dir = {
-            _PACKAGE_NAME: "lib"
-        },
-        package_data = {
-            _PACKAGE_NAME: _PACKAGED_FILES
-        },
-        scripts = glob.glob("bin/*"),
-    )
-finally:
-    os.remove(here("MANIFEST.in"))
+    # package metadata
+    url = "https://github.com/ajmazurie/spate",
+    download_url = "https://github.com/ajmazurie/spate/archive/0.1.1.zip",
+    classifiers = [
+        "Development Status :: 4 - Beta",
+        "Environment :: Console",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 2.7",
+        "Topic :: System :: Distributed Computing"])
