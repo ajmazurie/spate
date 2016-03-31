@@ -4,6 +4,7 @@ import collections
 import functools
 import gzip
 import os
+import sys
 import textwrap
 
 from .. import core
@@ -55,14 +56,21 @@ def stream_writer (target):
 #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 def dedent_text_block (text, ignore_empty_lines = False):
-    text_ = []
-    for line in textwrap.dedent(text).strip().splitlines():
+    text_, min_n_leading_whitespaces = [], sys.maxint
+    for line in text.splitlines():
         line = line.rstrip()
-        if (ignore_empty_lines) and (line == ''):
+        if (line == ''):
+            if (not ignore_empty_lines):
+                text_.append(line)
             continue
+
+        min_n_leading_whitespaces = min(
+            min_n_leading_whitespaces,
+            len(line) - len(line.lstrip()))
+
         text_.append(line)
 
-    return text_
+    return map(lambda line: line[min_n_leading_whitespaces:], text_)
 
 def flatten_text_block (text):
     text_ = []

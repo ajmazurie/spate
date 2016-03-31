@@ -98,19 +98,27 @@ def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
         body = '\n'.join(utils.dedent_text_block(
             workflow.render_job_content(name)))
 
+        # we list all upstream jobs ...
         parent_job_names = workflow.get_job_predecessors(name)
+        # ... ignoring these that won't run this time
+        parent_job_names = filter(
+            lambda name: name in job_name_to_idx, parent_job_names)
+
         if (len(parent_job_names) == 0):
             dependencies = ''
         else:
-            job_name_mapper = lambda x: ":${JOB_%d_ID}" % job_name_to_idx[x]
+            job_name_mapper = lambda name: \
+                ":${JOB_%d_ID}" % job_name_to_idx[name]
             dependencies = " --dependency=afterok" + ''.join(
                 map(job_name_mapper, parent_job_names))
 
         target_fh.write((
             "\n# %(name)s\n"
             "JOB_%(job_idx)d_ID=$("
-            "sbatch%(dependencies)s "
-            "<<'EOB'\n#!/bin/bash\n%(body)s\nEOB\n"
+            "sbatch%(dependencies)s --job-name \"%(name)s\" "
+            "<<'EOB_JOB_%(job_idx)d'\n"
+            "#!/bin/bash\n%(body)s\n"
+            "EOB_JOB_%(job_idx)d\n"
             "); JOB_%(job_idx)d_ID=${JOB_%(job_idx)d_ID##* }\n"
             ) % locals())
 

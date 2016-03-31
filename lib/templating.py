@@ -55,7 +55,7 @@ def render_job_content (workflow, name, template_engine = None):
 
     job_template = workflow.get_job_content(name)
     if (job_template is None):
-        return None
+        return ''
 
     # set up the job environment
     job_env = {}
