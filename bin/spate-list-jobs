@@ -19,9 +19,9 @@ parser.add_argument("-a", "--all-jobs",
     dest = "outdated_only", action = "store_false", default = True,
     help = "(optional) if set, will consider all jobs instead of outdated ones")
 
-parser.add_argument("-d", "--id-only",
-    dest = "id_only", action = "store_true", default = False,
-    help = "(optional) if set, will limit the display to job identifiers only")
+parser.add_argument("-n", "--name-only",
+    dest = "name_only", action = "store_true", default = False,
+    help = "(optional) if set, will limit the display to job names only")
 
 parser.add_argument("-c", "--count-only",
     dest = "count_only", action = "store_true", default = False,
@@ -68,8 +68,7 @@ logging.config.dictConfig({
         "handlers": ["default"],
         "level": logging_level,
         "propagate": True
-        }}
-    })
+        }}})
 
 def error (msg, is_exception = False):
     if (is_exception):
@@ -84,20 +83,20 @@ if (options.input_fn is None):
 elif (not os.path.exists(options.input_fn)):
     error("file not found: %s" % options.input_fn)
 
-if (options.id_only and options.count_only):
-    error("--id-only is not compatible with --count-only")
+if (options.name_only and options.count_only):
+    error("--name-only is not compatible with --count-only")
 
 #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 try:
     w = spate.load(options.input_fn)
 
-    if (options.id_only or options.count_only):
+    if (options.name_only or options.count_only):
         jobs = w.list_jobs(outdated_only = options.outdated_only)
 
-        if (options.id_only):
-            for job_id in jobs:
-                sys.stdout.write("%s\n" % job_id)
+        if (options.name_only):
+            for name in jobs:
+                sys.stdout.write("%s\n" % name)
         else:
             sys.stdout.write("%d\n" % len(list(jobs)))
 

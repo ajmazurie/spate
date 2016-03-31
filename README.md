@@ -19,17 +19,17 @@ workflow = spate.new_workflow("my_workflow")
 workflow.add_job(
 	inputs = ("file_A", "file_B"),  # two input files
 	outputs = "file_C",  # one output file
-	template = "cat {{INPUT0}} {{INPUT1}} > {{OUTPUT}}")
+	content = "cat {{INPUT0}} {{INPUT1}} > {{OUTPUT}}")
 
 # use the Mustache templating engine
 # to build the job's body out of the
 # generic template we declared above
-spate.set_template_engine(spate.mustache_engine)
+spate.set_template_engine(spate.mustache_template_engine)
 
 # export this workflow as a shell script
 spate.to_shell_script(workflow, "my_workflow.sh")
 
-# export this workflow as a SLURM job array
+# export this workflow as a SLURM sbatch script
 spate.to_slurm(workflow, "my_workflow.slurm")
 ```
 
@@ -40,4 +40,4 @@ At the time of writing **Spate** supports the following export targets:
 - **Makeflow** workflow execution engine scripts
 - **Drake** workflow execution engine scripts
 - **TORQUE/PBS** batch scheduler job arrays
-- **SLURM** batch scheduler job arrays
+- **SLURM** batch scheduler sbatch scripts
