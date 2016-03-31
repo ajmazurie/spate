@@ -3,7 +3,6 @@ import logging
 import os
 
 from .. import errors
-from .. import templates
 import utils
 
 __all__ = (
@@ -70,7 +69,7 @@ def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
     """
     utils.ensure_workflow(workflow)
 
-    job_ids = workflow.list_jobs(
+    jobs = workflow.list_jobs(
         outdated_only = outdated_only)
 
     target_fh, is_named_target = utils.stream_writer(target)
@@ -94,28 +93,28 @@ def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
     target_fh.write("#!/bin/bash\n%s\n" % '\n'.join(sbatch_args))
 
     # write per-job sbatch subscripts
-    job_idx, job_id_to_idx = 1, {}
-    for job_id in job_ids:
+    job_idx, job_name_to_idx = 1, {}
+    for name in jobs:
         body = '\n'.join(utils.dedent_text_block(
-            templates.render_job(workflow, job_id)))
+            workflow.render_job_content(name)))
 
-        parent_job_ids = workflow.get_job_predecessors(job_id)
-        if (len(parent_job_ids) == 0):
+        parent_job_names = workflow.get_job_predecessors(name)
+        if (len(parent_job_names) == 0):
             dependencies = ''
         else:
-            job_id_mapper = lambda x: ":${JOB_%d_ID}" % job_id_to_idx[x]
+            job_name_mapper = lambda x: ":${JOB_%d_ID}" % job_name_to_idx[x]
             dependencies = " --dependency=afterok" + ''.join(
-                map(job_id_mapper, parent_job_ids))
+                map(job_name_mapper, parent_job_names))
 
         target_fh.write((
-            "\n# %(job_id)s\n"
+            "\n# %(name)s\n"
             "JOB_%(job_idx)d_ID=$("
             "sbatch%(dependencies)s "
             "<<'EOB'\n#!/bin/bash\n%(body)s\nEOB\n"
             "); JOB_%(job_idx)d_ID=${JOB_%(job_idx)d_ID##* }\n"
             ) % locals())
 
-        job_id_to_idx[job_id] = job_idx
+        job_name_to_idx[name] = job_idx
         job_idx += 1
 
     n_jobs = job_idx - 1

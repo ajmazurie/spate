@@ -36,8 +36,8 @@ import spate
 workflow = spate.new_workflow("example-1")
 
 # add some jobs
-workflow.add_job("A", ("B", "C"), job_id = "x")  # A-[x]->B,C
-workflow.add_job(("A", "C"), "D", job_id = "y")  # A,C-[y]->D
+workflow.add_job("A", ("B", "C"), name = "x")  # A-[x]->B,C
+workflow.add_job(("A", "C"), "D", name = "y")  # A,C-[y]->D
 
 # print some basic information about this workflow
 print "number of jobs:", workflow.number_of_jobs
@@ -89,17 +89,17 @@ workflow = spate.new_workflow("example-2")
 workflow.add_job(
     inputs = "A",
     outputs = ("B", "C"),
-    job_id = "x",
-    template = """
+    name = "x",
+    content = """
         grep my_pattern A > B
         grep -v my_pattern A > C
-    """)
+        """)
 
 workflow.add_job(
     inputs = ("A", "C"),
     outputs = "D",
-    job_id = "y",
-    template = "cat A C > D")
+    name = "y",
+    content = "cat A C > D")
 
 # export this workflow as a shell script (BASH by default)
 spate.to_shell_script(workflow, "example_2.sh")
@@ -150,7 +150,7 @@ import spate
 
 # set the template engine to the default
 # one, which will use string.Template
-spate.set_template_engine(spate.default_engine)
+spate.set_template_engine(spate.default_template_engine)
 
 workflow = spate.new_workflow("example-3a")
 
@@ -158,17 +158,17 @@ workflow = spate.new_workflow("example-3a")
 workflow.add_job(
     inputs = "A",
     outputs = ("B", "C"),
-    job_id = "x",
-    template = """
+    name = "x",
+    content = """
         grep my_pattern $INPUT > $OUTPUT0
         grep -v my_pattern $INPUT > $OUTPUT1
-    """)
+        """)
 
 workflow.add_job(
     inputs = ("A", "C"),
     outputs = "D",
-    job_id = "y",
-    template = "cat $INPUT0 $INPUT1 > $OUTPUT")
+    name = "y",
+    content = "cat $INPUT0 $INPUT1 > $OUTPUT")
 
 # export this workflow as a shell script
 spate.to_shell_script(workflow, "example_3a.sh")
@@ -179,7 +179,7 @@ import spate
 
 # set the template engine to Mustache (note that the optional
 # dependency 'pystache' must be installed for this to work)
-spate.set_template_engine(spate.mustache_engine)
+spate.set_template_engine(spate.mustache_template_engine)
 
 workflow = spate.new_workflow("example-3b")
 
@@ -187,17 +187,17 @@ workflow = spate.new_workflow("example-3b")
 workflow.add_job(
     inputs = "A",
     outputs = ("B", "C"),
-    job_id = "x",
-    template = """
+    name = "x",
+    content = """
         grep my_pattern {{INPUT}} > {{OUTPUT0}}
         grep -v my_pattern {{INPUT}} > {{OUTPUT1}}
-    """)
+        """)
 
 workflow.add_job(
     inputs = ("A", "C"),
     outputs = "D",
-    job_id = "y",
-    template = "cat {{#INPUTS}}{{.}} {{/INPUTS}}> {{OUTPUT}}")
+    name = "y",
+    content = "cat {{#INPUTS}}{{.}} {{/INPUTS}}> {{OUTPUT}}")
 
 # export this workflow as a shell script
 spate.to_shell_script(workflow, "example_3b.sh")

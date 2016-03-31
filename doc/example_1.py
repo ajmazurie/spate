@@ -4,8 +4,8 @@ import spate
 workflow = spate.new_workflow("example-1")
 
 # add some jobs
-workflow.add_job("A", ("B", "C"), job_id = "x")  # A-[x]->B,C
-workflow.add_job(("A", "C"), "D", job_id = "y")  # A,C-[y]->D
+workflow.add_job("A", ("B", "C"), name = "x")  # A-[x]->B,C
+workflow.add_job(("A", "C"), "D", name = "y")  # A,C-[y]->D
 
 # print some basic information about this workflow
 print "number of jobs:", workflow.number_of_jobs

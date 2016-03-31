@@ -1,9 +1,9 @@
 
+import collections
 import logging
 import os
 
 from .. import errors
-from .. import templates
 import utils
 
 __all__ = (
@@ -40,11 +40,19 @@ def to_makeflow (workflow, target, outdated_only = True,
     target_fh, is_named_target = utils.stream_writer(target)
     logger.debug("exporting %s to %s" % (workflow, target_fh))
 
+    # write global variables
+    global_kwargs = collections.OrderedDict()
+    for (k, v) in workflow.get_kwargs().iteritems():
+        global_kwargs[k] = v
     for (k, v) in makeflow_kwargs.iteritems():
+        global_kwargs[k] = v
+
+    for (k, v) in global_kwargs.iteritems():
         target_fh.write("%s=%s\n" % (k, v))
 
+    # write jobs
     n_jobs = 0
-    for (job_id, input_paths, output_paths) in jobs:
+    for (name, input_paths, output_paths) in jobs:
         if (len(input_paths) == 0):
             raise errors.SpateException(
                 "Makeflow requires at least one input per job")
@@ -55,10 +63,10 @@ def to_makeflow (workflow, target, outdated_only = True,
 
         # note: Makeflow only allows a one-line body
         body = utils.flatten_text_block(
-            templates.render_job(workflow, job_id))
+            workflow.render_job_content(name))
 
         target_fh.write("\n# %s\n%s: %s\n\t%s\n\n" % (
-            job_id,
+            name,
             ' '.join(output_paths),
             ' '.join(input_paths),
             body))

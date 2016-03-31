@@ -35,11 +35,11 @@ def from_json (data):
               "workflow": str  # name of the workflow
               "jobs": [  # list of jobs
                 {
-                  "id": str,  # job name
+                  "name": str,  # job name
                   "inputs": list of str,  # list of input paths (optional)
                   "outputs": list of str,  # list of output paths (optional)
-                  "template": str,  # job template (optional)
-                  "data": dict,  # data associated with this job (optional)
+                  "content": str,  # executable content (optional)
+                  "kwargs": dict,  # keyword arguments (optional)
                 },
                 ...
               ]
@@ -53,9 +53,9 @@ def from_json (data):
                 yield (
                     job.get("inputs"),
                     job.get("outputs"),
-                    job.get("template"),
-                    job["id"],
-                    job.get("data", {}))
+                    job.get("content"),
+                    job["name"],
+                    job.get("kwargs", {}))
 
         w.add_jobs(jobs())
         return w
@@ -87,9 +87,9 @@ def to_json (workflow, outdated_only = True):
         "jobs": []
     }
 
-    for job_id in sorted(workflow.list_jobs(outdated_only = outdated_only)):
-        job_inputs, job_outputs = workflow.get_job_paths(job_id)
-        job_entry = collections.OrderedDict(id = job_id)
+    for name in sorted(workflow.list_jobs(outdated_only = outdated_only)):
+        job_inputs, job_outputs = workflow.get_job_paths(name)
+        job_entry = collections.OrderedDict(name = name)
 
         if (len(job_inputs) > 0):
             job_entry["inputs"] = job_inputs
@@ -97,13 +97,13 @@ def to_json (workflow, outdated_only = True):
         if (len(job_outputs) > 0):
             job_entry["outputs"] = job_outputs
 
-        job_template = workflow.get_job_template(job_id)
-        if (job_template is not None) and (job_template.strip() != ''):
-            job_entry["template"] = job_template
+        job_content = workflow.get_job_content(name)
+        if (job_content is not None) and (job_content.strip() != ''):
+            job_entry["content"] = job_content
 
-        job_data = workflow.get_job_data(job_id)
+        job_data = workflow.get_job_kwargs(name)
         if (len(job_data) > 0):
-            job_entry["data"] = job_data
+            job_entry["kwargs"] = job_data
 
         data["jobs"].append(job_entry)
 
@@ -125,13 +125,13 @@ def from_yaml (data):
             workflow:
                 name: <str>  # name of the workflow
             jobs:
-            - id: <str>  # job identifier
+            - name: <str>  # job identifier
               inputs:  # list of input paths (optional)
               - <str>
               outputs:  # list of output paths (optional)
               - <str>
-              template: <str>  # job template (optional)
-              data:  # job data (optional)
+              content: <str>  # executable content (optional)
+              kwargs:  # keyword arguments (optional)
                 <key>: <value>
             ...
     """

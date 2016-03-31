@@ -4,7 +4,6 @@ import os
 import sys
 
 from .. import core
-from .. import templates
 from .. import utils as coreutils
 import utils
 
@@ -55,9 +54,9 @@ def echo (workflow, outdated_only = True, decorated = True, colorized = True,
         core.PATH_STATUS.MISSING: " MISSING",
     }
 
-    def job_line (job_id, job_status):
+    def job_line (name, job_status):
         return "%s%s" % (
-            job_id,
+            name,
             {
                 True: _TERMINAL_JOB_LINE_SUFFIX[job_status],
                 False: ''
@@ -95,12 +94,12 @@ def echo (workflow, outdated_only = True, decorated = True, colorized = True,
         raw_job_line = job_line
         raw_path_line = path_line
 
-        def job_line (job_id, job_status):
+        def job_line (name, job_status):
             return {
                     True: _TERMINAL_JOB_LINE_FGCOLOR[job_status],
                     False: colorama.Style.BRIGHT,
                 }[colorized] + \
-                raw_job_line(job_id, job_status) + \
+                raw_job_line(name, job_status) + \
                 colorama.Style.RESET_ALL
 
         def path_line (path, path_status, is_input):
@@ -120,11 +119,11 @@ def echo (workflow, outdated_only = True, decorated = True, colorized = True,
 
     try:
         n_jobs = 0
-        for ((job_id, job_status), input_paths, output_paths) in jobs:
+        for (name, job_status, input_paths, output_paths) in jobs:
             for (input_path, path_status) in input_paths:
                 stream.write(path_line(input_path, path_status, True) + '\n')
 
-            stream.write(job_line(job_id, job_status) + '\n')
+            stream.write(job_line(name, job_status) + '\n')
 
             for (output_path, path_status) in output_paths:
                 stream.write(path_line(output_path, path_status, False) + '\n')
@@ -134,11 +133,11 @@ def echo (workflow, outdated_only = True, decorated = True, colorized = True,
 
         if (outdated_only):
             stream.write("total: %d outdated job%s (out of %d)\n" % (
-                n_jobs, {True: 's', False: ''}[n_jobs > 1],
+                n_jobs, 's' if (n_jobs != 1) else '',
                 workflow.number_of_jobs))
         else:
             stream.write("total: %d job%s\n" % (
-                n_jobs, {True: 's', False: ''}[n_jobs > 1]))
+                n_jobs, 's' if (n_jobs != 1) else ''))
 
     finally:
         if (decorated or colorized):
@@ -188,12 +187,12 @@ def to_shell_script (workflow, target, outdated_only = True,
             target_fh.write("%s\n" % str(shell_arg).strip())
 
     n_jobs = 0
-    for job_id in workflow.list_jobs(outdated_only = outdated_only):
+    for name in workflow.list_jobs(outdated_only = outdated_only):
         body = utils.dedent_text_block(
-            templates.render_job(workflow, job_id),
+            workflow.render_job_content(name),
             ignore_empty_lines = False)
 
-        target_fh.write("\n# %s\n%s\n" % (job_id, '\n'.join(body)))
+        target_fh.write("\n# %s\n%s\n" % (name, '\n'.join(body)))
         n_jobs += 1
 
     logger.debug("%d jobs exported" % n_jobs)

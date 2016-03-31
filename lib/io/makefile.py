@@ -4,7 +4,6 @@ import logging
 import os
 
 from .. import errors
-from .. import templates
 import utils
 
 __all__ = (
@@ -43,16 +42,24 @@ def to_makefile (workflow, target, outdated_only = True,
     target_fh, is_named_target = utils.stream_writer(target)
     logger.debug("exporting %s to %s" % (workflow, target_fh))
 
+    # write global variables
     if (shell is not None):
         target_fh.write("\nSHELL := %s\n" % shell)
 
+    global_kwargs = collections.OrderedDict()
+    for (k, v) in workflow.get_kwargs().iteritems():
+        global_kwargs[k] = v
     for (k, v) in make_kwargs.iteritems():
+        global_kwargs[k] = v
+
+    for (k, v) in global_kwargs.iteritems():
         target_fh.write("%s = %s\n" % (k, v))
 
+    # write jobs
     target_paths, all_paths = collections.OrderedDict(), {}
 
     n_jobs, job_contents = 0, []
-    for (job_id, input_paths, output_paths) in jobs:
+    for (name, input_paths, output_paths) in jobs:
         # ensure that we have at least one output path
         if (len(output_paths) == 0):
             raise errors.SpateException(
@@ -73,11 +80,11 @@ def to_makefile (workflow, target, outdated_only = True,
 
         # Make accepts multi-line job content, but no empty lines
         job_content = utils.dedent_text_block(
-            templates.render_job(workflow, job_id),
+            workflow.render_job_content(name),
             ignore_empty_lines = True)
 
         job_contents.append("\n# %s\n%s: %s\n\t%s\n" % (
-            job_id,
+            name,
             ' '.join(output_paths),
             ' '.join(input_paths),
             '\n\t'.join(['@' + line for line in job_content])))

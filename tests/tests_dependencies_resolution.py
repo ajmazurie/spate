@@ -1,7 +1,7 @@
-""" Tests of the job dependency resolution algorithms
+"""
+Tests of the job dependency resolution algorithms
 
-    TODO: test list_jobs() with temporary files
-    TODO: test list_jobs() with a pre-generated DAG
+TODO: test list_jobs() with a pre-generated DAG
 """
 
 import spate
@@ -45,8 +45,8 @@ class DependenciesResolutionTests (unittest.TestCase):
 
         # we should not be able to create two jobs that produces the same path
         with self.assertRaises(spate.SpateException):
-            workflow.add_job(_("a"), _("b"), job_id = "dummy-1")
-            workflow.add_job(_("c"), _("b"), job_id = "dummy-2")
+            workflow.add_job(_("a"), _("b"), name = "dummy-1")
+            workflow.add_job(_("c"), _("b"), name = "dummy-2")
 
         # the offending job should have been removed, but not previous ones
         self.assertTrue("dummy-1" in workflow)
@@ -67,12 +67,12 @@ class DependenciesResolutionTests (unittest.TestCase):
         with self.assertRaises(spate.SpateException):
             workflow.add_job(
                 _("a"), _("b"),
-                job_id = "dummy-1")
+                name = "dummy-1")
 
             workflow.add_job(
                 (_("c"), _("d")),
                 (_("d"), _("e")),
-                job_id = "dummy-2")
+                name = "dummy-2")
 
         # the offending job should have been removed, but not previous ones
         self.assertTrue("dummy-1" in workflow)
@@ -90,9 +90,9 @@ class DependenciesResolutionTests (unittest.TestCase):
 
         # we should not be able to create cycles in a workflow
         with self.assertRaises(spate.SpateException):
-            workflow.add_job(_("a"), _("b"), job_id = "dummy-1")
-            workflow.add_job(_("b"), _("c"), job_id = "dummy-2")
-            workflow.add_job(_("c"), _("a"), job_id = "dummy-3")
+            workflow.add_job(_("a"), _("b"), name = "dummy-1")
+            workflow.add_job(_("b"), _("c"), name = "dummy-2")
+            workflow.add_job(_("c"), _("a"), name = "dummy-3")
 
         # the offending job should have been removed
         self.assertTrue("dummy-1" in workflow)
@@ -109,14 +109,14 @@ class DependenciesResolutionTests (unittest.TestCase):
         tf = TemporaryFiles()
         _ = lambda path: tf.tmp(path, wanted = False)
 
-        workflow.add_job(outputs = _("a"), job_id = "dummy-1")
-        workflow.add_job(outputs = _("b"), job_id = "dummy-2")
-        workflow.add_job(inputs = _("c"), job_id = "dummy-3")
-        workflow.add_job(inputs = _("d"), job_id = "dummy-4")
+        workflow.add_job(outputs = _("a"), name = "dummy-1")
+        workflow.add_job(outputs = _("b"), name = "dummy-2")
+        workflow.add_job(inputs = _("c"),  name = "dummy-3")
+        workflow.add_job(inputs = _("d"),  name = "dummy-4")
         workflow.add_job(
             (_("a"), _("b")),
             (_("c"), _("d")),
-            job_id = "dummy-5")
+            name = "dummy-5")
 
         self.assertEqual(workflow.get_job_predecessors("dummy-5"),
             ("dummy-1", "dummy-2"))
@@ -146,7 +146,7 @@ class DependenciesResolutionTests (unittest.TestCase):
 
             i += 1
 
-        job_level = lambda job_id: workflow.get_job_data(job_id)["_level"]
+        job_level = lambda name: workflow.get_job_kwargs(name)["_level"]
 
         # test 1: we create each file in the jobs chain in order
         tf.tmp("dummy_path_0", True)
@@ -155,35 +155,35 @@ class DependenciesResolutionTests (unittest.TestCase):
             tf.tmp("dummy_path_%d" % i, True)
 
             # asking for outdated jobs should only return downstream jobs
-            job_ids = list(workflow.list_jobs(
+            job_names = list(workflow.list_jobs(
                 outdated_only = True, with_descendants = True))
 
-            self.assertEqual(len(job_ids), CHAIN_LENGTH - i)
+            self.assertEqual(len(job_names), CHAIN_LENGTH - i)
             self.assertMonotonousIncrease(
-                [job_level(job_id) for job_id in job_ids])
+                [job_level(name) for name in job_names])
 
             # while asking for all jobs should return the whole chain
-            job_ids = list(workflow.list_jobs(
+            job_names = list(workflow.list_jobs(
                 outdated_only = False, with_descendants = True))
 
-            self.assertEqual(len(job_ids), CHAIN_LENGTH)
+            self.assertEqual(len(job_names), CHAIN_LENGTH)
             self.assertMonotonousIncrease(
-                [job_level(job_id) for job_id in job_ids])
+                [job_level(name) for name in job_names])
 
             # asking for outdated, root jobs should only return one job at most
-            job_ids = list(workflow.list_jobs(
+            job_names = list(workflow.list_jobs(
                 outdated_only = True, with_descendants = False))
 
-            self.assertTrue(len(job_ids) < 2)
-            if (len(job_ids) == 1):
-                self.assertEqual(job_level(job_ids[0]), i)
+            self.assertTrue(len(job_names) < 2)
+            if (len(job_names) == 1):
+                self.assertEqual(job_level(job_names[0]), i)
 
             # asking for all root jobs should only return one job
-            job_ids = list(workflow.list_jobs(
+            job_names = list(workflow.list_jobs(
                 outdated_only = False, with_descendants = False))
 
-            self.assertEqual(len(job_ids), 1)
-            self.assertEqual(job_level(job_ids[0]), 0)
+            self.assertEqual(len(job_names), 1)
+            self.assertEqual(job_level(job_names[0]), 0)
 
         # test 2: we go backward and update each input file
         for i in range(CHAIN_LENGTH - 1, 0, -1):
@@ -195,13 +195,13 @@ class DependenciesResolutionTests (unittest.TestCase):
             tf.tmp("dummy_path_%d" % i, True)
 
             # asking for outdated jobs should only return downstream jobs
-            job_ids = list(workflow.list_jobs(
+            job_names = list(workflow.list_jobs(
                 outdated_only = True, with_descendants = True))
 
-            self.assertEqual(len(job_ids), CHAIN_LENGTH - i)
+            self.assertEqual(len(job_names), CHAIN_LENGTH - i)
             self.assertMonotonousIncrease(
-                [job_level(job_id) for job_id in job_ids])
-            self.assertEqual(job_level(job_ids[0]), i)
+                [job_level(name) for name in job_names])
+            self.assertEqual(job_level(job_names[0]), i)
 
     def test_jobs_ordering_in_ffl (self):
         workflow = spate.new_workflow()
@@ -212,32 +212,32 @@ class DependenciesResolutionTests (unittest.TestCase):
         workflow.add_job(
             tf.tmp("a", False),
             tf.tmp("b", False),
-            job_id = "dummy-job-1",
+            name = "dummy-job-1",
             _level = 1)
 
         workflow.add_job(
             tf.tmp("b", False),
             tf.tmp("c", False),
-            job_id = "dummy-job-2",
+            name = "dummy-job-2",
             _level = 2)
 
         workflow.add_job(
             (tf.tmp("c", False),
              tf.tmp("f", False)),
             tf.tmp("d", False),
-            job_id = "dummy-job-3",
+            name = "dummy-job-3",
             _level = 3)
 
         workflow.add_job(
             tf.tmp("a", False),
             tf.tmp("e", False),
-            job_id = "dummy-job-4",
+            name = "dummy-job-4",
             _level = 1)
 
         workflow.add_job(
             tf.tmp("e", False),
             tf.tmp("f", False),
-            job_id = "dummy-job-5",
+            name = "dummy-job-5",
             _level = 2)
 
         job_to_level = {
@@ -248,23 +248,23 @@ class DependenciesResolutionTests (unittest.TestCase):
             "dummy-job-5": 2}
 
         level_to_jobs = {}
-        for job_id, level in job_to_level.iteritems():
-            level_to_jobs.setdefault(level, []).append(job_id)
+        for (name, level) in job_to_level.iteritems():
+            level_to_jobs.setdefault(level, []).append(name)
 
         # for each level,
         for level in sorted(level_to_jobs):
             # we create the input paths for the jobs of that level
-            for job_id in level_to_jobs[level]:
-                input_paths, _ = workflow.get_job_paths(job_id)
+            for name in level_to_jobs[level]:
+                input_paths, _ = workflow.get_job_paths(name)
                 for path in input_paths:
                     tf.tmp(path, True)
 
             # we expect the jobs immediately listed
             # as obsolete to be those for this level
-            job_ids = list(workflow.list_jobs(
+            job_names = list(workflow.list_jobs(
                 outdated_only = True, with_descendants = False))
 
-            self.assertEqual(sorted(job_ids), sorted(level_to_jobs[level]))
+            self.assertEqual(sorted(job_names), sorted(level_to_jobs[level]))
 
 if (__name__ == "__main__"):
     unittest.main()

@@ -40,10 +40,10 @@ def to_graphviz (workflow, filename = None, outdated_only = True):
         with_status = True,
         with_paths = True)
 
-    for ((job_id, job_status), input_paths_status, output_paths_status) in jobs:
-        job_node_key = node_id(core._NODE_TYPE.JOB, job_id)
+    for ((name, job_status), input_paths_status, output_paths_status) in jobs:
+        job_node_key = node_id(core._NODE_TYPE.JOB, name)
         g.add_node(job_node_key,
-            label = job_id,
+            label = name,
             _type = core._NODE_TYPE.JOB.name,
             _status = job_status.name)
 

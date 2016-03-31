@@ -4,7 +4,6 @@ import logging
 import os
 
 from .. import errors
-from .. import templates
 import utils
 
 __all__ = (
@@ -49,9 +48,9 @@ def to_torque_array (workflow, output_prefix,
         with_descendants = False)
 
     n_jobs = 0
-    for job_id in jobs:
+    for name in jobs:
         body = utils.flatten_text_block(
-            templates.render_job(workflow, job_id))
+            workflow.render_job_content(name))
 
         torque_jobs_fh.write(body + '\n')
         n_jobs += 1

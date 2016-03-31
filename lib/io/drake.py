@@ -3,7 +3,6 @@ import logging
 import os
 
 from .. import errors
-from .. import templates
 import utils
 
 __all__ = (
@@ -37,14 +36,14 @@ def to_drake (workflow, target, outdated_only = True):
     logger.debug("exporting %s to %s" % (workflow, target_fh))
 
     n_jobs = 0
-    for (job_id, input_paths, output_paths) in jobs:
+    for (name, input_paths, output_paths) in jobs:
         # note: Drake doesn't allow empty lines
         body = '\n\t'.join(utils.dedent_text_block(
-            templates.render_job(workflow, job_id),
+            workflow.render_job_content(name),
             ignore_empty_lines = True))
 
         target_fh.write("; %s\n%s <- %s\n\t%s\n\n" % (
-            job_id,
+            name,
             ', '.join(output_paths),
             ', '.join(input_paths),
             body))

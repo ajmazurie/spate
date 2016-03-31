@@ -8,7 +8,6 @@ import textwrap
 
 from .. import core
 from .. import utils
-from .. import templates
 
 def ensure_workflow (obj):
     if (not isinstance(obj, core._workflow)):
