@@ -5,7 +5,7 @@ import setuptools
 
 setuptools.setup(
     name = "spate",
-    version = "0.2.0",
+    version = "0.2.1",
     description = (
         "Lightweight workflow composition and generation engine"),
 
@@ -31,7 +31,7 @@ setuptools.setup(
 
     # package metadata
     url = "https://github.com/ajmazurie/spate",
-    download_url = "https://github.com/ajmazurie/spate/archive/0.2.0.zip",
+    download_url = "https://github.com/ajmazurie/spate/archive/0.2.1.zip",
     classifiers = [
         "Development Status :: 4 - Beta",
         "Environment :: Console",

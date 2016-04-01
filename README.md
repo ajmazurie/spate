@@ -39,11 +39,11 @@ spate.to_slurm(workflow, "my_workflow.slurm")
 
 ## Supported execution environments
 
-- Unix shell scripts (e.g., BASH or SH)*
+- Unix shell scripts (e.g., BASH or SH) [1]
 - Unix [Make](https://en.wikipedia.org/wiki/Makefile) files
 - [Makeflow](http://ccl.cse.nd.edu/software/makeflow/) scripts
 - [Drake](https://github.com/Factual/drake) scripts
 - [TORQUE/PBS](https://en.wikipedia.org/wiki/TORQUE) job scheduler job arrays
 - [SLURM](http://slurm.schedmd.com/) job scheduler [sbatch](http://slurm.schedmd.com/sbatch.html) scripts
 
-> *: these environments do not support job dependencies; **Spate** will export only these jobs that can run concurrently
+> [1]: these environments do not support job dependencies; **Spate** will export only these jobs that can run concurrently
