@@ -1,5 +1,7 @@
 """
 Test of workflow import and export features
+
+TODO: add test for to_slurm()
 """
 
 import spate

@@ -69,7 +69,7 @@ def render_job_content (workflow, name, template_engine = None):
     for (prefix, paths) in (("INPUT", job_inputs), ("OUTPUT", job_outputs)):
         job_env[prefix + 'S'] = paths
         job_env[prefix + 'N'] = len(paths)
-        job_env[prefix] = paths[0] if (len(paths) > 0) else None
+        job_env[prefix] = paths[0] if (len(paths) > 0) else ''
 
     for (n, input_path) in enumerate(job_inputs):
         job_env["INPUT%d" % n] = input_path

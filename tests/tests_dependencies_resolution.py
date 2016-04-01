@@ -17,7 +17,7 @@ class TemporaryFiles:
 
     def tmp (self, path, wanted):
         path = os.path.join(self._cwd, path)
-        exists = os.path.exists(path)
+        exists = os.path.isfile(path)
 
         if (exists and (not wanted)):  # delete the file
             os.remove(path)
@@ -25,7 +25,22 @@ class TemporaryFiles:
                 del self._current_files[path]
 
         elif (wanted):  # create or touch the file
-            open(path, 'w').close()
+            if (exists):
+                previous_mtime = os.path.getmtime(path)
+            else:
+                previous_mtime = None
+            while True:
+                # we ensure that if we touch the file,
+                # its modification time is different
+                fh = open(path, 'w')
+                fh.write(str(time.time()))
+                fh.close()
+                current_mtime = os.path.getmtime(path)
+                if (current_mtime == previous_mtime):
+                    time.sleep(1)
+                else:
+                    break
+
             self._current_files[path] = True
 
         return path
@@ -136,39 +151,36 @@ class DependenciesResolutionTests (unittest.TestCase):
         tf = TemporaryFiles()
 
         # we create a chain of CHAIN_LENGTH jobs that each
-        # use the path produced by the previous job
+        # use as input a file produced by the previous job
         CHAIN_LENGTH = 3
         for i in range(CHAIN_LENGTH):
             workflow.add_job(
-                tf.tmp("dummy_path_%d" % i, False),
-                tf.tmp("dummy_path_%d" % (i+1), False),
+                tf.tmp("dummy_file_%d" % i, False),
+                tf.tmp("dummy_file_%d" % (i+1), False),
                 _level = i)
-
             i += 1
 
-        job_level = lambda name: workflow.get_job_kwargs(name)["_level"]
+        job_level = lambda name: workflow.get_job_kwarg(name, "_level")
 
         # test 1: we create each file in the jobs chain in order
-        tf.tmp("dummy_path_0", True)
+        tf.tmp("dummy_file_0", True)
         for i in range(1, CHAIN_LENGTH + 1):
             # here we create the input path for job i
-            tf.tmp("dummy_path_%d" % i, True)
+            tf.tmp("dummy_file_%d" % i, True)
 
             # asking for outdated jobs should only return downstream jobs
             job_names = list(workflow.list_jobs(
                 outdated_only = True, with_descendants = True))
 
             self.assertEqual(len(job_names), CHAIN_LENGTH - i)
-            self.assertMonotonousIncrease(
-                [job_level(name) for name in job_names])
+            self.assertMonotonousIncrease(map(job_level, job_names))
 
             # while asking for all jobs should return the whole chain
             job_names = list(workflow.list_jobs(
                 outdated_only = False, with_descendants = True))
 
             self.assertEqual(len(job_names), CHAIN_LENGTH)
-            self.assertMonotonousIncrease(
-                [job_level(name) for name in job_names])
+            self.assertMonotonousIncrease(map(job_level, job_names))
 
             # asking for outdated, root jobs should only return one job at most
             job_names = list(workflow.list_jobs(
@@ -187,21 +199,18 @@ class DependenciesResolutionTests (unittest.TestCase):
 
         # test 2: we go backward and update each input file
         for i in range(CHAIN_LENGTH - 1, 0, -1):
-            # we wait a whole second before updating input files,
-            # since that's the minimum resolution of os.path.getmtime()
-            time.sleep(1)
-
             # here we update the input path for job i
-            tf.tmp("dummy_path_%d" % i, True)
+            tf.tmp("dummy_file_%d" % i, True)
 
             # asking for outdated jobs should only return downstream jobs
             job_names = list(workflow.list_jobs(
                 outdated_only = True, with_descendants = True))
 
             self.assertEqual(len(job_names), CHAIN_LENGTH - i)
-            self.assertMonotonousIncrease(
-                [job_level(name) for name in job_names])
+            self.assertMonotonousIncrease(map(job_level, job_names))
             self.assertEqual(job_level(job_names[0]), i)
+
+            time.sleep(1)
 
     def test_jobs_ordering_in_ffl (self):
         workflow = spate.new_workflow()

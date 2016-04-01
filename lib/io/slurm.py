@@ -44,11 +44,25 @@ _SBATCH_OPTIONS_WITH_UNDERLINE = (
     "cpu_bind",
     "mem_bind")
 
-def _slurm_flag_mapper (flag):
-    if (flag in _SBATCH_OPTIONS_WITH_UNDERLINE):
-        return flag
-    else:
-        return _SBATCH_OPTIONS_WITH_DASH.get(flag, flag).replace('_', '-')
+def process_kwargs (kwargs, **pre_kwargs):
+    def _slurm_flag_mapper (flag):
+        if (flag in _SBATCH_OPTIONS_WITH_UNDERLINE):
+            return flag
+        else:
+            return _SBATCH_OPTIONS_WITH_DASH.get(flag, flag).replace('_', '-')
+
+    sbatch_kwargs = utils.parse_flags(
+        kwargs, pre_kwargs, {}, _slurm_flag_mapper)
+
+    sbatch_args = []
+    for k in sorted(sbatch_kwargs):
+        v = sbatch_kwargs[k]
+        if (v is None):
+            sbatch_args.append("#SBATCH --%s" % k)
+        else:
+            sbatch_args.append("#SBATCH --%s %s" % (k, v))
+
+    return sorted(sbatch_args)
 
 def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
     """ Export a workflow as a SLURM sbatch script
@@ -76,21 +90,13 @@ def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
     logger.debug("exporting %s to %s" % (workflow, target_fh))
 
     # write master sbatch script options
-    sbatch_kwargs = utils.parse_flags(
-        sbatch_kwargs,
-        {"job-name": workflow.name},
-        {},
-        _slurm_flag_mapper)
+    workflow_kwargs = {"job-name": workflow.name}
+    for (k, v) in workflow.get_kwargs().iteritems():
+        if (k.lower().startswith("_sbatch__")):
+            workflow_kwargs[k[9:]] = v
 
-    sbatch_args = []
-    for k in sorted(sbatch_kwargs):
-        v = sbatch_kwargs[k]
-        if (v is None):
-            sbatch_args.append("#SBATCH --%s" % k)
-        else:
-            sbatch_args.append("#SBATCH --%s %s" % (k, v))
-
-    target_fh.write("#!/bin/bash\n%s\n" % '\n'.join(sbatch_args))
+    master_sbatch_args = process_kwargs(sbatch_kwargs, **workflow_kwargs)
+    target_fh.write("#!/bin/bash\n%s\n" % '\n'.join(master_sbatch_args))
 
     # write per-job sbatch subscripts
     job_idx, job_name_to_idx = 1, {}
@@ -98,9 +104,19 @@ def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
         body = '\n'.join(utils.dedent_text_block(
             workflow.render_job_content(name)))
 
-        # we list all upstream jobs ...
+        # write job sbatch script options
+        job_kwargs = {"job-name": name}
+        for (k, v) in workflow.get_job_kwargs(name).iteritems():
+            if (k.lower().startswith("_sbatch__")):
+                job_kwargs[k[9:]] = v
+
+        job_sbatch_args = process_kwargs(job_kwargs, **job_kwargs)
+        body = '\n'.join(job_sbatch_args) + '\n' + body
+
+        # we list all upstream jobs,
         parent_job_names = workflow.get_job_predecessors(name)
-        # ... ignoring these that won't run this time
+        # ignoring these that will be skipped
+        # over because they are current
         parent_job_names = filter(
             lambda name: name in job_name_to_idx, parent_job_names)
 
@@ -115,7 +131,7 @@ def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
         target_fh.write((
             "\n# %(name)s\n"
             "JOB_%(job_idx)d_ID=$("
-            "sbatch%(dependencies)s --job-name \"%(name)s\" "
+            "sbatch%(dependencies)s "
             "<<'EOB_JOB_%(job_idx)d'\n"
             "#!/bin/bash\n%(body)s\n"
             "EOB_JOB_%(job_idx)d\n"

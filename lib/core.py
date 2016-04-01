@@ -32,12 +32,12 @@ class _NODE_TYPE (enum.Enum):
 class _workflow:
     """ Simple representation of a file-based data processing workflow
     """
-    def __init__ (self, name = None):
+    def __init__ (self, name = None, **kwargs):
         if (name is None):
             name = utils.random_string()
 
         self._graph = networkx.DiGraph(name = name)
-        self._kwargs = {}
+        self._kwargs = kwargs
 
         logger.debug("created a new workflow with name '%s'" % name)
 
@@ -879,13 +879,14 @@ class _workflow:
         return "<spate.workflow name:'%s' njobs:%d npaths:%d>" % (
             self.name, self.number_of_jobs, self.number_of_paths)
 
-def new_workflow (name = None):
+def new_workflow (name = None, **kwargs):
     """ Create a new workflow object
 
         Arguments:
             name (str, optional): name of the workflow
+            **kwargs (dict): keyword arguments
 
         Returns:
             object: a workflow object
     """
-    return _workflow(name)
+    return _workflow(name, **kwargs)
