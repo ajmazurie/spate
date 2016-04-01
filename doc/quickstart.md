@@ -1,6 +1,6 @@
-# (very) Quickstart
+# Spate quickstart
 
-**Spate** is a lightweight library to manipulate file-based data processing workflows, decoupled from the software (and hardware) environment that will execute this workflow. Because of this decoupling you can design a workflow without worrying about where to run it, and focus on its logic instead. Since **Spate** is a Python library, you can use complex Python logic to build your workflow the way you want.
+**Spate** is a lightweight library to create file-based data processing workflows (or *dataflows*), regardless of the software (and hardware) environment that will execute this workflow. Because of this decoupling you can design a workflow without worrying about where to run it, and focus on its logic instead. Since **Spate** is a Python library, you can use complex Python logic to build your workflow the way you want.
 
 With **Spate** you declare your jobs as accepting input *paths* (i.e., files or directories) and/or producing output paths. **Spate** will automatically identify the jobs that need to be executed based on the existence of these paths, and their modification time. For example, a job accepting an input file ``A`` and producing an output file ``B`` will be flagged for execution either if ``B`` is missing, or if ``A`` is more recent than ``B``.
 
@@ -17,17 +17,13 @@ $ wget <path_to_github_release>
 $ pip install <path_to_package>
 ```
 
-Note that **Spate** will also install some mandatory dependencies automatically. Optional dependencies can also be installed by the user to enable the use of additional functions. To install these dependencies, you can use `pip` again:
-
-```shell
-$ pip install -r OPTIONAL_DEPENDENCIES
-```
+Note that **Spate** also installs some mandatory dependencies automatically. Optionally the [pygraphviz](https://pygraphviz.github.io/) library can be installed to enable the drawing of workflows with [Graphviz](http://www.graphviz.org/); see example below.
 
 ## Usage
 
 ### Example 1. Basic abstract workflow
 
-**Spate** is meant to be used by other Python scripts, and once installed can be imported by typing `import spate`. Here is an example script `example_1.py`:
+**Spate** is meant to be used by other Python scripts, and once installed can be imported by typing `import spate`. Here is an example script `example_1.py` creating a toy workflow:
 
 ```python
 import spate
@@ -43,16 +39,18 @@ workflow.add_job(("A", "C"), "D", name = "y")  # A,C-[y]->D
 print "number of jobs:", workflow.number_of_jobs
 print "number of paths:", workflow.number_of_paths
 
-# print the jobs in this workflow, in the order of their
-# execution; note that for the 'colorized' option to work,
-# the optional dependency 'Colorama' must be installed
+# print the jobs in this workflow,
+# in the order of their execution
 spate.echo(workflow, colorized = True)
 
-# save this workflow for latter use
+# create a diagram of this workflow;
+# note that this requires the optional
+# 'pygraphviz' package to be installed
+spate.draw(workflow, "example_1.png")
+
+# save this workflow for later (re)use
 spate.save(workflow, "example_1.spate.gz")
 ```
-
-Here we created a simple workflow with two jobs. Note that for convenience and readability the `add_job()` function accepts either single strings or list of strings to declare input and output paths.
 
 Running this script will create the workflow, save it as a file for later use, and display the jobs that will be executed (in the right order) if the workflow was to be run:
 
@@ -75,9 +73,13 @@ total: 2 outdated jobs (out of 2)
 
 Here the `spate.echo()` function generated a simple list of job identifiers preceded by input paths (lines prefixed with `<`) and followed by output paths (lines prefixed with `>`). If this workflow was to be executed, job `x` would be run before job `y`.
 
+![example_1.png](example_1.png)
+
+Here the `spate.draw()` function generated a diagram of the workflow showing both the jobs (rounded rectangles) and paths (folder-shaped nodes) and their status; red paths are missing, and red jobs are outdated.
+
 ### Example 2. Basic concrete workflow
 
-In the previous example our jobs did not have any code attached; as such, our workflow was purely abstract. To attach a piece of code to a job you can use the `template` argument of the `add_job()` function. This argument accepts a string with your code. For example, given the following script `example_2.py`:
+In the previous example our jobs did not have any code attached; as such, our workflow was purely abstract. To attach a piece of code to a job you can use the `content` argument of the `add_job()` function. This argument accepts a string with your code. For example, given the following script `example_2.py`:
 
 ```python
 import spate
@@ -105,12 +107,14 @@ workflow.add_job(
 spate.to_shell_script(workflow, "example_2.sh")
 ```
 
-Upon execution this script will generate an executable BASH shell script (also other shells can be used as well) that is ready to run:
+Upon execution this script will generate an executable BASH shell script (other shells can be used as well) that is ready to run:
 
 ```shell
-$ python example_2.py
+$ python ./example_2.py
+
 $ ls
 example_2.py example_2.sh
+
 $ less example_2.sh
 #/bin/bash
 
@@ -120,13 +124,11 @@ grep -v my_pattern A > C
 
 # y
 cat A C > D
-
-$ ./example_2.sh
 ```
 
 ### Example 3. Advanced concrete workflow
 
-You may have noticed that the code for both jobs `x` and `y` in our previous example had the name of the input and output paths hardcoded. This is inconvenient if you want to write generic code (i.e., code that would work regardless of the name of the input and/or output paths). To solve this problem **Spate** allow the use of *template engines*.
+You may have noticed that the content for both jobs `x` and `y` in our previous example had the name of the input and output paths hardcoded. This is inconvenient if you want to write generic code (i.e., code that would work regardless of the name of the input and/or output paths). To solve this problem **Spate** allow the use of *template engines*.
 
 A template engine will look for specific tags in your job code and replace them by the content of some variables. By default, all jobs have the following variables accessible to their code:
 
@@ -177,8 +179,7 @@ spate.to_shell_script(workflow, "example_3a.sh")
 ```python
 import spate
 
-# set the template engine to Mustache (note that the optional
-# dependency 'pystache' must be installed for this to work)
+# set the template engine to Mustache
 spate.set_template_engine(spate.mustache_template_engine)
 
 workflow = spate.new_workflow("example-3b")

@@ -57,6 +57,7 @@ def stream_writer (target):
 
 def dedent_text_block (text, ignore_empty_lines = False):
     text_, min_n_leading_whitespaces = [], sys.maxint
+
     for line in text.splitlines():
         line = line.rstrip()
         if (line == ''):
@@ -69,6 +70,13 @@ def dedent_text_block (text, ignore_empty_lines = False):
             len(line) - len(line.lstrip()))
 
         text_.append(line)
+
+    # we remove the first and last empty lines, if any
+    if (len(text_) > 0):
+        if (text_[0] == ''):
+            text_ = text_[1:]
+        if (text_[-1] == ''):
+            text_ = text_[:-1]
 
     return map(lambda line: line[min_n_leading_whitespaces:], text_)
 
