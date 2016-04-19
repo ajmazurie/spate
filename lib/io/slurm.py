@@ -10,7 +10,7 @@ __all__ = (
 
 logger = logging.getLogger(__name__)
 
-_SBATCH_OPTIONS_WITH_DASH = {
+_SBATCH_OPTIONS_WITH_SHORTCUT = {
     "a": "array",
     "A": "account",
     "B": "extra-node-info",
@@ -44,23 +44,25 @@ _SBATCH_OPTIONS_WITH_UNDERLINE = (
     "cpu_bind",
     "mem_bind")
 
-def process_kwargs (kwargs, **pre_kwargs):
+def process_sbatch_kwargs (kwargs, pre_kwargs = None):
     def _slurm_flag_mapper (flag):
         if (flag in _SBATCH_OPTIONS_WITH_UNDERLINE):
             return flag
         else:
-            return _SBATCH_OPTIONS_WITH_DASH.get(flag, flag).replace('_', '-')
+            flag = _SBATCH_OPTIONS_WITH_SHORTCUT.get(flag, flag)
+            return flag.replace('_', '-')
 
-    sbatch_kwargs = utils.parse_flags(
-        kwargs, pre_kwargs, {}, _slurm_flag_mapper)
+    sbatch_kwargs = utils.merge_kwargs(
+        kwargs, pre_kwargs, None, _slurm_flag_mapper)
 
     sbatch_args = []
     for k in sorted(sbatch_kwargs):
         v = sbatch_kwargs[k]
-        if (v is None):
+        if (v is True):
             sbatch_args.append("#SBATCH --%s" % k)
         else:
-            sbatch_args.append("#SBATCH --%s %s" % (k, v))
+            sbatch_args.append("#SBATCH --%s %s" % (k,
+                utils.escape_quotes(str(v))))
 
     return sorted(sbatch_args)
 
@@ -80,6 +82,13 @@ def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
 
         Notes:
         [1] If no job is found in the workflow, no file will be created
+        [2] Any workflow keyword argument starting with '_sbatch_' (case
+            insensitive) will be interpreted as a parameter for SBATCH; e.g.,
+            _sbatch_partition would set the value for the --partition parameter
+        [3] Similarily, any job keyword argument starting with '_sbatch_' will
+            be interpreted as a parameter for SBATCH for that particular job
+        [4] The **sbatch_kwargs provided when calling this function will
+            overwrite any workflow keyword argument for SBATCH
     """
     utils.ensure_workflow(workflow)
 
@@ -89,13 +98,18 @@ def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
     target_fh, is_named_target = utils.stream_writer(target)
     logger.debug("exporting %s to %s" % (workflow, target_fh))
 
-    # write master sbatch script options
-    workflow_kwargs = {"job-name": workflow.name}
-    for (k, v) in workflow.get_kwargs().iteritems():
-        if (k.lower().startswith("_sbatch__")):
-            workflow_kwargs[k[9:]] = v
+    extract_sbatch_options = lambda kwargs: \
+        utils.filter_kwargs(kwargs, "sbatch")
 
-    master_sbatch_args = process_kwargs(sbatch_kwargs, **workflow_kwargs)
+    # write master sbatch script options
+    workflow_kwargs = workflow.get_kwargs()
+    workflow_sbatch_kwargs = {"J": workflow.name}
+    for (k, v) in extract_sbatch_options(workflow_kwargs):
+        workflow_sbatch_kwargs[k] = v
+
+    master_sbatch_args = process_sbatch_kwargs(
+        sbatch_kwargs, workflow_sbatch_kwargs)
+
     target_fh.write("#!/bin/bash\n%s\n" % '\n'.join(master_sbatch_args))
 
     # write per-job sbatch subscripts
@@ -105,13 +119,13 @@ def to_slurm (workflow, target, outdated_only = True, **sbatch_kwargs):
             workflow.render_job_content(name)))
 
         # write job sbatch script options
-        job_kwargs = {"job-name": name}
-        for (k, v) in workflow.get_job_kwargs(name).iteritems():
-            if (k.lower().startswith("_sbatch__")):
-                job_kwargs[k[9:]] = v
+        job_kwargs = workflow.get_job_kwargs(name)
+        job_sbatch_kwargs = {"J": name}
+        for (k, v) in extract_sbatch_options(job_kwargs):
+            job_sbatch_kwargs[k] = v
 
-        job_sbatch_args = process_kwargs(job_kwargs, **job_kwargs)
-        body = '\n'.join(job_sbatch_args) + '\n' + body
+        job_sbatch_args = process_sbatch_kwargs(job_sbatch_kwargs)
+        body = '\n'.join(job_sbatch_args) + '\n\n' + body
 
         # we list all upstream jobs,
         parent_job_names = workflow.get_job_predecessors(name)

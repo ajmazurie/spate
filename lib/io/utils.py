@@ -4,6 +4,8 @@ import collections
 import functools
 import gzip
 import os
+import pipes
+import re
 import sys
 import textwrap
 
@@ -90,25 +92,42 @@ def flatten_text_block (text):
 
     return '; '.join(text_)
 
-def parse_flags (kwargs, pre_kwargs, post_kwargs, mapper):
-    kwargs_ = {}
-    for (k, v) in pre_kwargs.iteritems():
-        kwargs_[k] = v
+def escape_quotes (text):
+    return pipes.quote(text)
 
-    for (k, v) in kwargs.iteritems():
-        if (v is None):
-            continue
+def merge_kwargs (kwargs, pre_kwargs, post_kwargs, mapper = None):
+    kwargs_ = {}
+    def add_kwarg (k, v):
+        # we ignore None and empty strings
+        if (v is None) or (str(v).strip() == ''):
+            return
+        # we ignore False
+        if (isinstance(v, bool)) and (not v):
+            return
+
         if (mapper is not None):
             k = mapper(k)
-        if (isinstance(v, bool)):
-            if (v == True):
-                kwargs_[k] = None
-            elif (v == False):
-                continue
-        else:
-            kwargs_[k] = v
-
-    for (k, v) in post_kwargs.iteritems():
         kwargs_[k] = v
 
+    if (pre_kwargs is not None):
+        for (k, v) in pre_kwargs.iteritems():
+            add_kwarg(k, v)
+
+    if (kwargs is not None):
+        for (k, v) in kwargs.iteritems():
+            add_kwarg(k, v)
+
+    if (post_kwargs is not None):
+        for (k, v) in post_kwargs.iteritems():
+            add_kwarg(k, v)
+
     return kwargs_
+
+def filter_kwargs (kwargs, prefix):
+    pattern = re.compile("_+%s_+(.+)" % prefix, re.IGNORECASE)
+    for (k, v) in kwargs.iteritems():
+        m = pattern.match(k)
+        if (m is None):
+            continue
+
+        yield (m.group(1), v)

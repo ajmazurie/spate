@@ -53,7 +53,8 @@ def to_makefile (workflow, target, outdated_only = True,
         global_kwargs[k] = v
 
     for (k, v) in global_kwargs.iteritems():
-        target_fh.write("%s = %s\n" % (k, v))
+        target_fh.write("%s = %s\n" % (k,
+            utils.escape_quotes(str(v))))
 
     # write jobs
     target_paths, all_paths = collections.OrderedDict(), {}

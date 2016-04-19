@@ -39,11 +39,14 @@ spate.to_slurm(workflow, "my_workflow.slurm")
 
 ## Supported execution environments
 
-- Unix shell scripts (e.g., BASH or SH) [1]
-- Unix [Make](https://en.wikipedia.org/wiki/Makefile) files
-- [Makeflow](http://ccl.cse.nd.edu/software/makeflow/) scripts
-- [Drake](https://github.com/Factual/drake) scripts
-- [TORQUE/PBS](https://en.wikipedia.org/wiki/TORQUE) job scheduler job arrays
-- [SLURM](http://slurm.schedmd.com/) job scheduler [sbatch](http://slurm.schedmd.com/sbatch.html) scripts
+Environment | Status | Comment
+--- | --- | ---
+Unix shell scripts | **Stable** | No parallel job execution; jobs are processed sequencially
+Unix [Make](https://en.wikipedia.org/wiki/Makefile) files | **Stable** |
+[Makeflow](http://ccl.cse.nd.edu/software/makeflow/) scripts | Experimental | Not fully tested
+[Drake](https://github.com/Factual/drake) scripts | Experimental | Not fully tested
+[SLURM](http://slurm.schedmd.com/) job scheduler | **Stable** | Produces [sbatch](http://slurm.schedmd.com/sbatch.html) scripts with directed acyclic graph of jobs. Tested with SLURM 14.11.11
+[HTCondor](https://research.cs.wisc.edu/htcondor/) job scheduler | Experimental | Produces [DAGMan](https://research.cs.wisc.edu/htcondor/dagman/dagman.html) scripts. Tested with HTCondor 8.4.4
+[TORQUE/PBS](https://en.wikipedia.org/wiki/TORQUE) job scheduler  | Experimental | Produces job arrays; does not handle job dependencies. Currently untested
 
-> [1]: these environments do not support job dependencies; **Spate** will export only these jobs that can run concurrently
+The following environments are considered for future releases: [Pegasus](https://pegasus.isi.edu/), [Swift](http://swift-lang.org/).

@@ -61,14 +61,12 @@ def to_torque_array (workflow, output_prefix,
         os.remove(torque_jobs_fn)
         return 0
 
-    qsub_kwargs = utils.parse_flags(
-        qsub_kwargs, {
-            "N": workflow.name,
-            "o": torque_jobs_fn + "_${PBS_JOBID}_${PBS_ARRAYID}.out",
-            "e": torque_jobs_fn + "_${PBS_JOBID}_${PBS_ARRAYID}.err",
-        }, {
-            "t": "1-%d" % n_jobs,
-        })
+    qsub_kwargs = utils.merge_kwargs(
+        qsub_kwargs,
+        {"N": workflow.name,
+         "o": torque_jobs_fn + "_${PBS_JOBID}_${PBS_ARRAYID}.out",
+         "e": torque_jobs_fn + "_${PBS_JOBID}_${PBS_ARRAYID}.err"},
+        {"t": "1-%d" % n_jobs})
 
     qsub_kwargs["N"] = qsub_kwargs["N"][:15]  # per QSUB documentation
 
@@ -86,7 +84,8 @@ def to_torque_array (workflow, output_prefix,
         if (v is None):
             qsub_args.append("#PBS -%s" % k)
         else:
-            qsub_args.append("#PBS -%s %s" % (k, v))
+            qsub_args.append("#PBS -%s %s" % (k,
+                utils.escape_quote(str(v))))
 
     qsub_args = '\n'.join(qsub_args)
 

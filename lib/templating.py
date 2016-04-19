@@ -2,6 +2,7 @@
 
 import string
 
+import errors
 import utils
 
 __all__ = (
@@ -41,9 +42,7 @@ def set_template_engine (template_engine):
             `spate.templates._base_template_engine`
     """
     global _current_template_engine
-    if (template_engine is None):
-        _current_template_engine = default_engine
-    else:
+    if (template_engine is not None):
         _ensure_template_engine(template_engine)
         _current_template_engine = template_engine
 
@@ -99,7 +98,16 @@ class default_template_engine (_base_template_engine):
     """
     @classmethod
     def render (cls, template, **kwargs):
-        return string.Template(template).safe_substitute(kwargs)
+        try:
+            return string.Template(template).substitute(kwargs)
+
+        except KeyError as e:
+            raise errors.SpateException(
+                "Unable to render job content: unknown placeholder %s" % e)
+
+        except Exception as e:
+            raise errors.SpateException(
+                "Unable to render job content: %s" % e)
 
 class mustache_template_engine (_base_template_engine):
     """ Mustache-based template engine
