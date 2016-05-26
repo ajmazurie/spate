@@ -1,11 +1,8 @@
 
 import collections
-import os
 import random
 import string
 import types
-
-import enum
 
 def is_string (obj):
     return isinstance(obj, types.StringTypes)
@@ -93,46 +90,3 @@ def cmp_dict (dict1, dict2):
             return False
 
     return True
-
-#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-class PATH_TYPE (enum.Enum):
-    UNKNOWN = -1
-    MISSING = 0
-    FILE = 1
-    DIRECTORY = 2
-
-def path_type (path):
-    if (not os.path.exists(path)):
-        return PATH_TYPE.MISSING
-    elif (os.path.isfile(path)):
-        return PATH_TYPE.FILE
-    elif (os.path.isdir(path)):
-        return PATH_TYPE.DIRECTORY
-    else:
-        return PATH_TYPE.UNKNOWN
-
-def path_mtime (path):
-    path_type_ = path_type(path)
-
-    if (path_type_ == PATH_TYPE.MISSING):
-        return None
-
-    elif (path_type_ == PATH_TYPE.UNKNOWN):
-        return None
-
-    elif (path_type_ == PATH_TYPE.FILE):
-        return os.path.getmtime(path)
-
-    elif (path_type_ == PATH_TYPE.DIRECTORY):
-        latest_mtime = 0
-        for (top_path, dir_names, file_names) in os.walk(path, followlinks = True):
-            for fn in file_names:
-                if (fn.startswith('.')):
-                    continue
-
-                mtime = os.path.getmtime(os.path.join(top_path, fn))
-                if (mtime > latest_mtime):
-                    latest_mtime = mtime
-
-        return latest_mtime

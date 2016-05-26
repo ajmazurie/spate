@@ -2,9 +2,10 @@
 import itertools
 import logging
 
-import utils
-import templating
 import errors
+import paths
+import templating
+import utils
 
 import enum
 import networkx
@@ -402,7 +403,7 @@ class _workflow:
         path_mtime, job_names = {}, []
         for (node_type, node) in networkx.topological_sort(self._graph):
             if (node_type == _NODE_TYPE.PATH):
-                path_mtime[node] = utils.path_mtime(node)
+                path_mtime[node] = paths.path_mtime(node)
             elif (node_type == _NODE_TYPE.JOB):
                 job_names.append(node)
 
