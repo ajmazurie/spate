@@ -10,11 +10,11 @@ import tempfile
 import StringIO
 
 _template_engines = (
-    spate.default_template_engine,
+    spate.string_template_engine,
     spate.mustache_template_engine)
 
 def _dummy_content (engine):
-    if (engine == spate.default_template_engine):
+    if (engine == spate.string_template_engine):
         return """\
             INPUTS: ${INPUT0} ${INPUT1} (${INPUTN})
             OUTPUTS: ${OUTPUT0} ${OUTPUT1} (${OUTPUTN})

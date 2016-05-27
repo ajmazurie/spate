@@ -1,8 +1,7 @@
 import spate
 
-# set the template engine to the default
-# one, which will use string.Template
-spate.set_template_engine(spate.default_template_engine)
+# use the simple Python 'string' engine
+spate.set_template_engine(spate.string_template_engine)
 
 workflow = spate.new_workflow("example-3a")
 

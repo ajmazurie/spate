@@ -9,7 +9,7 @@ __all__ = (
     "set_template_engine",
     "get_template_engine",
     "render_job_content",
-    "default_template_engine",
+    "string_template_engine",
     "mustache_template_engine",)
 
 def _ensure_template_engine (obj):
@@ -85,8 +85,8 @@ class _base_template_engine:
     def render (self, template, **kwargs):
         return template
 
-class default_template_engine (_base_template_engine):
-    """ Default template engine, based on the Python string.Template class
+class string_template_engine (_base_template_engine):
+    """ Python string.Template-based template engine
 
         Arguments:
             template (str): string.Template-compatible template
@@ -135,4 +135,4 @@ class mustache_template_engine (_base_template_engine):
 
         return pystache.render(template, kwargs)
 
-set_template_engine(default_template_engine)
+set_template_engine(mustache_template_engine)

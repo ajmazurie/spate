@@ -1,6 +1,6 @@
 import spate
 
-# set the template engine to Mustache
+# use the Mustache template engine
 spate.set_template_engine(spate.mustache_template_engine)
 
 workflow = spate.new_workflow("example-3b")

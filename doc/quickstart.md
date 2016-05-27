@@ -143,16 +143,15 @@ name | content
 `OUTPUT` | First output path
 `OUTPUTn` | Output path in position *n*, starting from zero
 
-The tags you will use in your job code are dependent of the template engine you chose. **Spate** comes with two engines: a very simple one using the `string.Template` class (see [here](https://docs.python.org/2/library/string.html#template-strings) for a documentation of its syntax), and a more comprehensive one using the Mustache syntax (see [here](http://mustache.github.io/) for the documentation).
+The tags you will use in your job code are dependent of the template engine you chose. **Spate** comes with two engines: a very simple one using the `string.Template` class (see [here](https://docs.python.org/2/library/string.html#template-strings) for a documentation of its syntax), and a more comprehensive one using the Mustache syntax (see [here](http://mustache.github.io/) for the documentation). By default **Spate** uses the Mustache engine.
 
 Setting a template engine for your workflow is as simple as calling the `spate.set_template_engine()` function. Here are two examples (one for each template engine), `example_3a.py` and `example_3b.py`:
 
 ```python
 import spate
 
-# set the template engine to the default
-# one, which will use string.Template
-spate.set_template_engine(spate.default_template_engine)
+# use the simple Python 'string' engine
+spate.set_template_engine(spate.string_template_engine)
 
 workflow = spate.new_workflow("example-3a")
 
@@ -179,7 +178,7 @@ spate.to_shell_script(workflow, "example_3a.sh")
 ```python
 import spate
 
-# set the template engine to Mustache
+# use the Mustache template engine
 spate.set_template_engine(spate.mustache_template_engine)
 
 workflow = spate.new_workflow("example-3b")

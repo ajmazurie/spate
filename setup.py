@@ -3,9 +3,12 @@
 import glob
 import setuptools
 
+__NAME__ = "spate"
+__VERSION__ = "0.2.3"
+
 setuptools.setup(
-    name = "spate",
-    version = "0.2.2",
+    name = __NAME__,
+    version = __VERSION__,
     description = (
         "Lightweight workflow composition and generation engine"),
 
@@ -30,8 +33,9 @@ setuptools.setup(
         "pyyaml"],
 
     # package metadata
-    url = "https://github.com/ajmazurie/spate",
-    download_url = "https://github.com/ajmazurie/spate/archive/0.2.2.zip",
+    url = "https://github.com/ajmazurie/" + __NAME__,
+    download_url = "https://github.com/ajmazurie/%s/archive/%s.zip" % (
+        __NAME__, __VERSION__),
     classifiers = [
         "Development Status :: 4 - Beta",
         "Environment :: Console",
