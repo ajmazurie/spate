@@ -7,7 +7,6 @@ import os
 import pipes
 import re
 import sys
-import textwrap
 
 from .. import core
 from .. import utils
